@@ -5,7 +5,7 @@ const { DatabaseSync } = require("node:sqlite");
 const sq = new DatabaseSync(":memory:");
 setDB({ q: async (text: string, params: any[] = []) => { const t = text.replace(/\$(\d+)/g, "?$1"); const st = sq.prepare(t); const ps = params.map((p) => (p === undefined ? null : p)); if (/^\s*(SELECT|WITH)/i.test(t) || /RETURNING/i.test(t)) return st.all(...ps); st.run(...ps); return []; } });
 process.env.APP_PASSWORD = "team-secret-123"; process.env.GOOGLE_CLIENT_ID = "cid"; process.env.GOOGLE_CLIENT_SECRET = "cs"; process.env.CRON_SECRET = "cron-xyz";
-delete process.env.OPENROUTER_API_KEY; delete process.env.KIMI_K3; delete process.env.ANTHROPIC_API_KEY;
+delete process.env.CRUSTDATA_API_KEY;
 const pages: Record<string, string> = { "https://acme.in/contact": "Write to partnerships@acme.in or call +91 22 4000 1234" };
 (globalThis as any).fetch = async (url: string) => {
   const u = String(url);

@@ -1,8 +1,19 @@
 # SponsorDesk
 
-Sponsorship brokerage agents for college fests and events: find sponsors with live budget signals, write priced offers, follow up without ever double-sending, classify replies, negotiate inside the floor, draft the MOU. Humans only for exceptions. Every decision cites its reasons.
+Sponsorship brokerage agents for any event (college fests, conferences, hackathons, meetups, sports and cultural events): find sponsors with live budget signals, write priced offers, follow up without ever double-sending, classify replies, negotiate inside the floor, draft the MOU. Humans only for meetings, negotiation and exceptions. Every decision cites its reasons.
 
-Model: any OpenAI-compatible endpoint through `KIMI_K3` (an OpenRouter `sk-or-` key or a Moonshot key; default model Kimi K3) or `OPENROUTER_API_KEY`; Anthropic (`ANTHROPIC_API_KEY`) and Gemini (`GEMINI_API_KEY`) also work. Crustdata (`CRUSTDATA_API_KEY`) supplies company and people data.
+**No AI key needed.** The only paid service is [Crustdata](https://crustdata.com) (`CRUSTDATA_API_KEY`) for company, people and web data. The agents are explicit rules and templates: same input, same output, every score shown factor by factor, and a sponsor email can never instruct the desk.
+
+### What one company costs in Crustdata credits
+| Step | Endpoint | Credits |
+|---|---|---|
+| Discover ~10 companies | `/company/search` | about 6 to 10 |
+| Score one company | `/company/enrich` (no `people` group: it is megabytes) | 2 |
+| Find decision makers | `/person/search` (12 results) | about 3 |
+| Business emails for the top 2 | `/person/enrich` with `contact.business_emails` | 4 |
+| Event brief web check | `/web/search/live` | 1 |
+
+Roughly 10 credits per fully researched sponsor. Credits are only charged when a call returns data.
 
 ## How it is built
 
@@ -25,15 +36,15 @@ Model: any OpenAI-compatible endpoint through `KIMI_K3` (an OpenRouter `sk-or-` 
 
 | Stage | Agent | In this app |
 |---|---|---|
-| Package | A0 | Brief tab: audience facts with sources, tiers, floor price, in-kind needs, signature |
-| Prospect | A1 | Board > Find sponsors: Claude searches Crustdata for funding, headcount growth, hiring, new leaders |
+| Package | A0 | One line in (name, organiser, dates, city, footfall, goal). One Crustdata web search for published numbers and past sponsors. Tiers priced by a stated rule (about INR 40 per attendee for title, scaled by event type), floor at 80% of the smallest tier, all editable |
+| Prospect | A1 | Crustdata company search: companies in your country with a funding round in the last 12 months or 8%+ headcount growth, in industries that fit your event type; brand-unsafe categories skipped |
 | Score | A1 | Dual point of view: our view x the company marketing team's view; priority = the lower of the two; every score shows its signals |
-| Decision makers | A2 | Primary, alternative and fallback contact per company, picked by relevance (not seniority); professional email and business phone from public sources or Crustdata; each checked (syntax, domain, MX, published on the cited page; E.164, switchboard vs direct) and scored out of 100 with the breakdown |
+| Decision makers | A2 | Crustdata people search for brand, partnership, campus or CSR owners at that company (not the CEO at 200+ people); alumni of the organiser flagged as warm paths; business email only if it belongs to THIS company (Crustdata often returns an address from a previous employer, which is rejected); checked (syntax, domain, MX) and scored out of 100 with the breakdown |
 | Pitch | A2 | First email is a priced offer (activation, price range, metric, reply "send"), never a meeting request |
 | Follow up | A2 | Max 3 emails, one thread per company, auto follow-ups only while nobody replied |
-| Replies | A2 | Gmail sweep, isolated classifier (sponsor email is untrusted input), cold mail stops for the whole company |
-| Negotiate | A5 | Below-floor offers become exceptions with a trade-value counter for a human to approve |
-| Close | A6 | MOU draft from the deal sheet |
+| Replies | A2 | Gmail sweep, rule-based classifier (interested, meeting, questions, referral, not now, declined, opt-out, out of office with return date, bounce), amounts in lakh or INR, prompt-injection attempts flagged; cold mail stops for the whole company |
+| Meet and negotiate | A3 to A5 | Scheduling emails, a 10-slide company deck with talk track, meeting notes turned into goals, next steps and a recap; below-floor offers become exceptions with a three-option trade counter (never a discount) for a human to approve |
+| Close and nurture | A6, A7 | 11-section MOU draft from the deal sheet; fortnightly sponsor updates from the team's own news |
 
 ## Safety rules enforced in code (`lib/ledger.ts`)
 
@@ -50,13 +61,13 @@ Sign in with email and password. On a new desk the first sign-in with `APP_PASSW
 
 ## Tests
 
-Node 22.5 or newer (`.nvmrc`). `npm run test:all` runs the ledger, email-engine failure, security and decision-maker, and end-to-end agent tests, with the model, Gmail and DNS mocked and `node:sqlite` standing in for Postgres. These prove the logic; row locking itself is Postgres behaviour and is not exercised by SQLite. CI runs typecheck, tests and build on every push and pull request.
+Node 22.5 or newer (`.nvmrc`). `npm run test:all` runs the ledger, email-engine failure, security and decision-maker, and end-to-end agent tests (A0 to A7 plus the reply classifier), with Crustdata, Gmail and DNS mocked from the live API's response shapes (the test fails if any AI provider is called) and `node:sqlite` standing in for Postgres. These prove the logic; row locking itself is Postgres behaviour and is not exercised by SQLite. CI runs typecheck, tests and build on every push and pull request.
 
 ## Deploy on Vercel
 
 1. Import this repo in Vercel.
 2. Storage > Create Database > Neon (free). This adds `DATABASE_URL`.
-3. Environment variables: `APP_PASSWORD`, `KIMI_K3` (or `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`), `CRUSTDATA_API_KEY`, `CRON_SECRET`, optional `TOKEN_KEY`, and for Gmail `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+3. Environment variables: `APP_PASSWORD`, `CRUSTDATA_API_KEY`, `CRON_SECRET`, optional `TOKEN_KEY` and `SD_COUNTRY` (default `IND`), and for Gmail `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. No AI key.
 4. Redeploy. Sign in with your email and `APP_PASSWORD` (this creates the admin), add your team in Settings, then type the event in one line.
 
 ### Gmail (optional, otherwise draft mode)
@@ -70,6 +81,8 @@ The daily cycle runs on weekdays at 10:15 IST (Vercel cron) and from the "Run da
 
 ## Honest limits
 
-- Contacts and signals are only as good as Crustdata's coverage; the app never invents an email, and unverified emails raise an exception.
-- When the deck or MOU agent cannot produce a document, the organiser's standard PDFs in `public/fallback/` are used.
+- Contacts and signals are only as good as Crustdata's coverage; the app never invents an email, and unverified emails raise an exception for a person to check.
+- Templates are plain and consistent rather than creative. Every draft waits for a human, so edit freely before approving.
+- Prices are a rule of thumb. Check them against what peer events charge before you lock the floor.
+- Meeting digests use keyword extraction: paste clean notes (Google Meet's notes work well) and read the recap before approving it.
 - The MOU is a draft for the institute's office, not legal advice. GST and TDS treatment must be confirmed by the accounts office.

@@ -159,7 +159,7 @@ export default function Page() {
           })}
         </div>
         <div className="rail-foot">
-          {me.name ? <>{me.name} · {me.role}<br /></> : null}Research: {data.settings.source === "crustdata" ? "Crustdata" : "live web search"} · {data.settings.model}<br />
+          {me.name ? <>{me.name} · {me.role}<br /></> : null}Data: {data.settings.source === "crustdata" ? "Crustdata" : "Crustdata key missing"} · {data.settings.engine}<br />
           <button onClick={() => api("/api/logout", {}).then(() => setAuthed(false))}>Log out</button>
         </div>
       </aside>
@@ -210,7 +210,7 @@ function Command({ data, act, busy, approver, progress, setProgress, flash, open
   const [clarify, setClarify] = useState<Any>(null);
   const s = data.settings;
   async function brief(l: string, sender: Any, answers = "") {
-    const r = await act("brief", { line: l, sender, answers }, answers ? "Researching again with your answers" : "Researching the event and pricing the tiers");
+    const r = await act("brief", { line: l, sender, answers }, answers ? "Researching again with your answers" : "Packaging the event and pricing the tiers");
     if (r?.clarify) setClarify({ ...r.clarify, line: l, sender });
     else if (r) setClarify(null);
     return r;
@@ -237,10 +237,10 @@ function Command({ data, act, busy, approver, progress, setProgress, flash, open
         <div className="composer">
           <div className="glyph" aria-hidden>₹</div>
           <h1>Tell the desk which event needs sponsors.</h1>
-          <p>One line is enough. The packaging agent researches the event on the web, finds last year's numbers and sponsors, and proposes tiers and a floor price for you to lock.</p>
+          <p>One line is enough: name, organiser, dates, city, expected footfall and goal. The packaging agent checks the web through Crustdata for published numbers, then proposes tiers and a floor price for you to lock. No AI key needed.</p>
           <div className="line">
-            <input value={line} onChange={(x) => setLine(x.target.value)} placeholder="E-Summit 2027, IIT Bombay, Jan 2027, goal ₹40 lakh" aria-label="Event in one line" />
-            <button className="btn big" disabled={!!busy || !line || !me.name} onClick={() => brief(line, me)}>{busy ? "Researching..." : "Research and package"}</button>
+            <input value={line} onChange={(x) => setLine(x.target.value)} placeholder="TechNova 2027, ABC Institute of Technology, 14-16 Feb 2027, Pune, 8000 footfall, goal ₹20 lakh" aria-label="Event in one line" />
+            <button className="btn big" disabled={!!busy || !line || !me.name} onClick={() => brief(line, me)}>{busy ? "Packaging..." : "Package my event"}</button>
           </div>
           <div className="meta">
             <input value={me.name} onChange={(x) => setMe({ ...me, name: x.target.value })} placeholder="Your name (signs the emails)" aria-label="Your name" />
@@ -348,7 +348,7 @@ function Clarify({ c, busy, onAnswer }: Any) {
       <ol>{(c.questions || []).map((q: string, i: number) => <li key={i}>{q}</li>)}</ol>
       <textarea value={a} onChange={(x) => setA(x.target.value)} placeholder="Answer here: website link, institute, year, who attends..." aria-label="Your answers" />
       <div className="row" style={{ marginTop: 10 }}>
-        <button className="btn" disabled={!!busy || !a.trim()} onClick={() => onAnswer(a.trim()).then(() => setA(""))}>{busy ? "Researching..." : "Answer and research again"}</button>
+        <button className="btn" disabled={!!busy || !a.trim()} onClick={() => onAnswer(a.trim()).then(() => setA(""))}>{busy ? "Packaging..." : "Answer and package"}</button>
         <span className="small muted">Nothing is packaged until the event is clear.</span>
       </div>
       <Sources list={c.sources} />
@@ -360,8 +360,8 @@ function Redo({ e, busy, brief }: Any) {
   const [line, setLine] = useState("");
   return (
     <div className="row" style={{ margin: "4px 0 14px" }}>
-      <input value={line} onChange={(x) => setLine(x.target.value)} placeholder="Not right? Describe the event in one line and A0 researches it again" style={{ flex: 1, minWidth: 260 }} />
-      <button className="btn ghost" disabled={!!busy || !line} onClick={() => brief(line, e.sender || {}).then(() => setLine(""))}>{busy ? "Researching..." : "Research again"}</button>
+      <input value={line} onChange={(x) => setLine(x.target.value)} placeholder="Not right? Describe the event in one line and A0 packages it again" style={{ flex: 1, minWidth: 260 }} />
+      <button className="btn ghost" disabled={!!busy || !line} onClick={() => brief(line, e.sender || {}).then(() => setLine(""))}>{busy ? "Packaging..." : "Package again"}</button>
     </div>
   );
 }
@@ -754,7 +754,7 @@ function Inbox({ data, act, busy, flash, open, can, me }: Any) {
       })}
       {!exs.length && <div className="panel"><div className="empty"><h3>Nothing needs you</h3>The agents handle the rest.</div></div>}
       <div className="panel" style={{ marginTop: 16 }}>
-        <h2>Replies</h2><p className="sub">Classified by an isolated model with no tools, because sponsor emails are untrusted input. Any reply stops cold mail to that whole company.</p>
+        <h2>Replies</h2><p className="sub">Classified by fixed rules, not a model, so a sponsor email can never instruct the desk. Any reply stops cold mail to that whole company.</p>
         {data.replies.map((r: Any) => <div key={r.id} className="small" style={{ marginBottom: 8 }}><span className="muted">{when(r.received_at)}</span> <b>{coName(r.company_id)}</b> <span className="chip">{r.classification}</span> {r.summary} {r.offer_inr ? <span className="money">{inr(r.offer_inr)}</span> : null} {String(r.gmail_id).startsWith("sim-") && <span className="chip">simulated</span>}</div>)}
         {!data.replies.length && <span className="muted small">No replies yet. You can simulate one from any deal room.</span>}
       </div>
@@ -903,7 +903,7 @@ function Sponsors({ data, act, busy, flash }: Any) {
 function Health() {
   const [h, setH] = useState<Any>(null);
   const [run, setRun] = useState(false);
-  const LABEL: Record<string, string> = { database: "Database", claude: "Claude", gemini: "Gemini (backup)", crustdata: "Crustdata", gmail: "Gmail" };
+  const LABEL: Record<string, string> = { database: "Database", engine: "Agent engine", crustdata: "Crustdata", gmail: "Gmail" };
   return (
     <div className="panel">
       <div className="spread"><div><h2>Check connections</h2><p className="sub">One tiny call to each service, so you know what works before running the agents.</p></div>
@@ -931,8 +931,8 @@ function Settings({ data, act, flash, can }: Any) {
         <div className="panel">
           <h2>Connections</h2>
           <dl className="kv" style={{ marginTop: 10 }}>
-            <dt>Model</dt><dd>{s.model} <span className={"chip " + (s.claude ? "good" : "bad")}>{s.claude ? "connected" : "key missing"}</span></dd>
-            <dt>Research data</dt><dd>{s.crustdata ? <span className="chip good">Crustdata</span> : <><span className="chip warn">Live web search</span><div className="small muted">Add CRUSTDATA_API_KEY in Vercel for verified emails and firmographics.</div></>}</dd>
+            <dt>Engine</dt><dd>{s.engine} <span className={"chip " + (s.crustdata ? "good" : "bad")}>{s.crustdata ? "Crustdata connected" : "Crustdata key missing"}</span></dd>
+            <dt>Research data</dt><dd>{s.crustdata ? <span className="chip good">Crustdata</span> : <><span className="chip bad">Not connected</span><div className="small muted">Add CRUSTDATA_API_KEY in Vercel: it is the only key the desk needs for company discovery, signals and contacts.</div></>}</dd>
             <dt>Gmail + Calendar</dt><dd>{s.gmail ? <>{s.gmail} {can("admin") && <><a href="/api/google/auth">Reconnect</a> · <a href="#" onClick={(e) => { e.preventDefault(); confirm("Disconnect Google? Sending and invites stop until you reconnect.") && act("google_disconnect", {}, "Disconnecting Google"); }}>Disconnect</a></>}</> : s.googleApp ? <a className="btn" href="/api/google/auth">Connect Google</a> : <span className="small muted">Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel, then connect.</span>}</dd>
           </dl>
         </div>

@@ -3,7 +3,7 @@ import { db, nowIso, uid, json, num, getSetting, setSetting } from "./db";
 import * as L from "./ledger";
 import * as A from "./agents";
 import * as G from "./gmail";
-import { dataSource } from "./claude";
+import { dataSource } from "./crustdata";
 import * as C from "./contacts";
 
 export const FALLBACK_DECK = "/fallback/sponsorship-deck.pdf";
@@ -85,10 +85,10 @@ export async function runDiscover(count: number) {
     const id = slug(c.domain || c.name);
     const r = await d.q(`INSERT INTO companies (id, name, domain, segment, stage, stage_reason, why_now, reasons, sources, updated_at)
       VALUES ($1,$2,$3,$4,'PROSPECT','discovered',$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING RETURNING id`,
-      [id, c.name, c.domain || "", c.segment || "", c.why_now || "", JSON.stringify({ signals: c.signals || [] }), JSON.stringify(raw.sources.slice(0, 12)), nowIso()]);
+      [id, c.name, c.domain || "", c.segment || "", c.why_now || "", JSON.stringify({ signals: c.signals || [], crustdata_company_id: c.crustdata_company_id || null, industry: c.industry || "" }), JSON.stringify((c.signals || []).filter((x: any) => /^https?:/.test(x.source || "")).map((x: any) => ({ url: x.source, title: x.claim })).slice(0, 12)), nowIso()]);
     if (r.length) { added.push(id); await L.log("A1", id, "discovered", c.why_now || ""); }
   }
-  await L.log("A1", null, "discover", `Found ${added.length} companies via ${dataSource()} (${raw.toolCalls.length} searches)`);
+  await L.log("A1", null, "discover", `Found ${added.length} companies via ${dataSource()} (${raw.toolCalls.length} searches${raw.credits ? `, ${raw.credits} credits` : ""})`);
   return { added, searches: raw.toolCalls.length };
 }
 
@@ -98,13 +98,13 @@ export async function runAnalyze(companyId: string) {
   const d = await db();
   const co = await company(companyId);
   await L.log("A1", companyId, "researching", `Scoring ${co.name} from both sides`);
-  const { data: a, raw } = await A.analyze(e, { name: co.name, domain: co.domain, why_now: co.why_now });
+  const { data: a, raw } = await A.analyze(e, { name: co.name, domain: co.domain, why_now: co.why_now, crustdata_company_id: co.reasons?.crustdata_company_id || undefined });
   const our = Math.max(0, Math.min(100, Math.round(num(a.our_pov?.score))));
   const their = Math.max(0, Math.min(100, Math.round(num(a.their_pov?.score))));
   const inter = Math.min(our, their);
   const priority = inter >= 70 ? "P1" : inter >= 50 ? "P2" : inter >= 35 ? "P3" : "DQ";
   const keep = a.decision !== "drop" && priority !== "DQ";
-  const reasons = { signals: a.signals || [], our_pov: a.our_pov, their_pov: a.their_pov };
+  const reasons = { ...(co.reasons || {}), signals: a.signals || [], our_pov: a.our_pov, their_pov: a.their_pov };
   await d.q(`UPDATE companies SET our_pov=$1, their_pov=$2, intersection=$3, priority=$4, model=$5, tier=$6, price_range=$7, angle=$8,
      audience_benefit=$9, reasons=$10, role_map=$11, decision=$12, sources=$13, draft_subject=$14, draft_body=$15, updated_at=$16 WHERE id=$17`,
     [our, their, inter, priority, a.model || "", a.tier || "", a.price_range || "", a.angle || "", a.audience_benefit || "",
