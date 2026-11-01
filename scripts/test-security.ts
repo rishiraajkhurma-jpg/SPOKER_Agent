@@ -1,6 +1,6 @@
 // Security and decision-maker tests against the real route handlers. node:sqlite stands in for Postgres; network is mocked.
-import { setDB, db, nowIso } from "../lib/db";
-import * as C from "../lib/contacts";
+import { setDB, db, nowIso } from "../src/lib/db";
+import * as C from "../src/lib/contacts";
 const { DatabaseSync } = require("node:sqlite");
 const sq = new DatabaseSync(":memory:");
 setDB({ q: async (text: string, params: any[] = []) => { const t = text.replace(/\$(\d+)/g, "?$1"); const st = sq.prepare(t); const ps = params.map((p) => (p === undefined ? null : p)); if (/^\s*(SELECT|WITH)/i.test(t) || /RETURNING/i.test(t)) return st.all(...ps); st.run(...ps); return []; } });
@@ -24,13 +24,13 @@ const cookieOf = (r: Response) => (r.headers.get("set-cookie") || "").split(";")
 let fails = 0; const eq = (n: string, g: any, w: any) => { const ok = JSON.stringify(g) === JSON.stringify(w); if (!ok) fails++; console.log(`${ok ? "PASS" : "FAIL"} ${n}${ok ? "" : ` got=${JSON.stringify(g)} want=${JSON.stringify(w)}`}`); };
 
 (async () => {
-  const { POST: login } = await import("../app/api/login/route");
-  const { POST: logout } = await import("../app/api/logout/route");
-  const { POST: act } = await import("../app/api/act/route");
-  const { GET: state } = await import("../app/api/state/route");
-  const { GET: cycleGet } = await import("../app/api/cycle/route");
-  const { GET: gAuth } = await import("../app/api/google/auth/route");
-  const { GET: gCb } = await import("../app/api/google/callback/route");
+  const { POST: login } = await import("../src/app/api/login/route");
+  const { POST: logout } = await import("../src/app/api/logout/route");
+  const { POST: act } = await import("../src/app/api/act/route");
+  const { GET: state } = await import("../src/app/api/state/route");
+  const { GET: cycleGet } = await import("../src/app/api/cycle/route");
+  const { GET: gAuth } = await import("../src/app/api/google/auth/route");
+  const { GET: gCb } = await import("../src/app/api/google/callback/route");
   const d = await db();
 
   // --- authentication

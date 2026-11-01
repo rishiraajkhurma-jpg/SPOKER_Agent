@@ -1,7 +1,7 @@
 // Regression tests for the ledger (every council bug). Compile with tsc to CommonJS, then run with node 22+.
 // node:sqlite stands in for Postgres; $n placeholders are rewritten to ?n.
-import { setDB, db, setSetting, nowIso } from "../lib/db";
-import * as L from "../lib/ledger";
+import { setDB, db, setSetting, nowIso } from "../src/lib/db";
+import * as L from "../src/lib/ledger";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DatabaseSync } = require("node:sqlite");

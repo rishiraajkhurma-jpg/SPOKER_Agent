@@ -1,4 +1,10 @@
 /** @type {import('next').NextConfig} */
-// Type errors fail the build (no ignoreBuildErrors). ESLint is not configured for this project; type checking is the gate.
-const nextConfig = {};
+const nextConfig = {
+  reactCompiler: true,
+  agentRules: false,
+  async redirects() {
+    return [{ source: "/", destination: "/desk", permanent: false }];
+  },
+};
+
 export default nextConfig;

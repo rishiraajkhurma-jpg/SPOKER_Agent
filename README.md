@@ -15,6 +15,25 @@ Sponsorship brokerage agents for any event (college fests, conferences, hackatho
 
 Roughly 10 credits per fully researched sponsor. Credits are only charged when a call returns data.
 
+## What you see
+
+- **Guided event brief.** Type the event the way you would describe it to a sponsor. A live meter scores the brief and shows what is missing (organiser, dates, footfall, audience, goal, postal address) and why each matters, with one-click examples. Then pick the sponsor categories you want (14, mapped to Crustdata industries) and any brands you already have in mind, or skip and let the desk choose.
+- **Companies.** A priority list where every card says who the company is, why it fits your event, both scores, the offer and the decision maker. Open one for the full story, people, next steps and timeline.
+- **Agents.** The eight agents as two assembly lines (win the deal, close and keep) with live status, real numbers and where they need you.
+- **Ask the desk.** A chat assistant on every screen that explains what is going on, why a company was picked, who to contact, what is waiting for you and how to do anything. It reads the desk's own data and needs no AI key. Optional: a free `GEMINI_API_KEY` from Google AI Studio makes replies more conversational; it only sees the same facts.
+- Theme: "Marigold" (indigo and festival gold) in light and dark, plus three more presets, built on the shadcn Base UI admin template (Next.js 16, Tailwind 4).
+
+## Run it on your laptop (no database account)
+
+Node 22.5 or newer:
+
+```bash
+npm install
+SQLITE_PATH=./desk.db APP_PASSWORD=choose-a-password CRUSTDATA_API_KEY=your-key npx next dev
+```
+
+Open http://localhost:3000 and sign in with any email and that password (the first sign-in creates the admin).
+
 ## How it is built
 
 ![SponsorDesk architecture: agents A0 to A7, the human gates, and the platform underneath](docs/sponsordesk-architecture.png)

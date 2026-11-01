@@ -1,11 +1,11 @@
 // End-to-end: every agent A0-A7 through the real flows with NO AI model. Crustdata is mocked at fetch with the
 // response shapes of the live 2025-11-01 API; node:sqlite stands in for Postgres. Any call to an AI provider fails the test.
-import { setDB, db, setSetting } from "../lib/db";
-import * as F from "../lib/flows";
-import * as L from "../lib/ledger";
-import * as A from "../lib/agents";
-import { lint } from "../lib/lint";
-import { setMxResolver } from "../lib/contacts";
+import { setDB, db, setSetting } from "../src/lib/db";
+import * as F from "../src/lib/flows";
+import * as L from "../src/lib/ledger";
+import * as A from "../src/lib/agents";
+import { lint } from "../src/lib/lint";
+import { setMxResolver } from "../src/lib/contacts";
 setMxResolver(async (d: string) => [{ exchange: "mx." + d }]);
 const { DatabaseSync } = require("node:sqlite");
 const sq = new DatabaseSync(":memory:");

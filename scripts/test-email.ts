@@ -1,8 +1,8 @@
 // Email engine failure tests: concurrency, caps, spacing, ambiguous delivery, DB failure after send, opt-out during send.
 // node:sqlite stands in for Postgres (single process: it proves the logic, not Postgres locking). Gmail is mocked at fetch.
-import { setDB, db, setSetting, nowIso } from "../lib/db";
-import * as L from "../lib/ledger";
-import * as F from "../lib/flows";
+import { setDB, db, setSetting, nowIso } from "../src/lib/db";
+import * as L from "../src/lib/ledger";
+import * as F from "../src/lib/flows";
 const { DatabaseSync } = require("node:sqlite");
 const sq = new DatabaseSync(":memory:");
 let failNextMarkSent = false;
