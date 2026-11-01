@@ -47,7 +47,7 @@ Open http://localhost:3000 and sign in with any email and that password (the fir
 
 | | |
 |---|---|
-| Live app | https://sponsordesk-blue.vercel.app/ |
+| Live app | https://spoker-agent.vercel.app/ |
 | Sample sponsor deck (Cult.fit x Aavhan) | https://sponsordesk-blue.vercel.app/d/5fa28c2a505a45ff8957 |
 | Demo walkthrough (Loom) | https://www.loom.com/share/4ec4186105f14dc88216a162973b5b2a |
 | Sample MOU drafted by A6 (Zepto x E-Summit 2027, unsigned draft) | [docs/sample-mou-zepto-esummit-draft.pdf](docs/sample-mou-zepto-esummit-draft.pdf) |
