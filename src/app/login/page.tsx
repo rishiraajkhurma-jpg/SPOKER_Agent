@@ -50,7 +50,7 @@ export default function LoginPage() {
           <h1 className="font-heading text-5xl leading-[1.05] font-bold text-balance">Your sponsorship team, minus the cold-calling.</h1>
           <p className="text-lg text-white/80">Eight agents find sponsors with fresh budgets, write priced offers and negotiate inside your floor. You approve what matters.</p>
           <ul className="space-y-3 text-sm text-white/85">
-            <li className="flex gap-3"><Sparkles className="size-5 shrink-0 text-gold" />Real company data from Crustdata. No AI key needed.</li>
+            <li className="flex gap-3"><Sparkles className="size-5 shrink-0 text-gold" />Real company data from Crustdata, voice and Indian languages from Sarvam.</li>
             <li className="flex gap-3"><Bot className="size-5 shrink-0 text-gold" />Ask the desk anything while the agents work.</li>
             <li className="flex gap-3"><ShieldCheck className="size-5 shrink-0 text-gold" />Nothing is sent until a named person approves it.</li>
           </ul>

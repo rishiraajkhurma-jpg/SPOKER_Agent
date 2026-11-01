@@ -1,4 +1,4 @@
-// Crustdata REST client (API version 2025-11-01). The only paid data source; no AI model anywhere.
+// Crustdata REST client (API version 2025-11-01). The only paid data source.
 // Verified against docs.crustdata.com/openapi-specs/2025-11-01/introduction:
 //   base https://api.crustdata.com, header "authorization: Bearer <key>", header "x-api-version: 2025-11-01".
 // Endpoints used (all on the standard plan): /company/search, /company/enrich, /person/search, /person/enrich,

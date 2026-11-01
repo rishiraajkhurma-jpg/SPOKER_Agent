@@ -2,7 +2,19 @@
 
 Sponsorship brokerage agents for any event (college fests, conferences, hackathons, meetups, sports and cultural events): find sponsors with live budget signals, write priced offers, follow up without ever double-sending, classify replies, negotiate inside the floor, draft the MOU. Humans only for meetings, negotiation and exceptions. Every decision cites its reasons.
 
-**No AI key needed.** The only paid service is [Crustdata](https://crustdata.com) (`CRUSTDATA_API_KEY`) for company, people and web data. The agents are explicit rules and templates: same input, same output, every score shown factor by factor, and a sponsor email can never instruct the desk.
+**Two paid services.** [Crustdata](https://crustdata.com) (`CRUSTDATA_API_KEY`) supplies company, people and web data. [Sarvam AI](https://www.sarvam.ai) (`SARVAM_API_KEY`, optional) adds voice and Indian languages. The decisions stay with explicit rules and templates: same input, same output, every score shown factor by factor, and a sponsor email can never instruct the desk.
+
+### How Sarvam is used
+| Feature | Sarvam model | What it does |
+|---|---|---|
+| Ask the desk by voice | Saaras v4 (speech to text) | Turns a spoken question into text in the language it was spoken |
+| Ask and answer in Indian languages | Mayura (to English), Sarvam Translate (from English) | Translates the question for the rules, then translates the rule answer back |
+| Listen to a reply | Bulbul v3 (text to speech) | Reads an assistant answer aloud; a spoken question is answered aloud |
+| Read sponsor replies | Mayura | Translates replies written in Indian scripts into English; the same reply rules then classify them |
+| Dictate meeting notes | Saaras v4 (speech to English) | Records in 25 second pieces and writes the notes in English |
+| Tidy notes | Sarvam 105B | Cleans dictated notes for the A5 digest; a person reads them first |
+
+Sarvam never scores companies, sets prices or writes sponsor emails. If it fails or the key is missing, the desk carries on with its rules in English, and the voice buttons are hidden. Calls run on the server through `src/lib/sarvam.ts`, so the key never reaches the browser.
 
 ### What one company costs in Crustdata credits
 | Step | Endpoint | Credits |
@@ -24,7 +36,7 @@ A clickable demo runs on GitHub Pages with fictional sample data: see the link i
 - **Guided event brief.** Type the event the way you would describe it to a sponsor. A live meter scores the brief and shows what is missing (organiser, dates, footfall, audience, goal, postal address) and why each matters, with one-click examples. Then pick the sponsor categories you want (14, mapped to Crustdata industries) and any brands you already have in mind, or skip and let the desk choose.
 - **Companies.** A priority list where every card says who the company is, why it fits your event, both scores, the offer and the decision maker. Open one for the full story, people, next steps and timeline.
 - **Agents.** The eight agents as two assembly lines (win the deal, close and keep) with live status, real numbers and where they need you.
-- **Ask the desk.** A chat assistant on every screen that explains what is going on, why a company was picked, who to contact, what is waiting for you and how to do anything. It reads the desk's own data and needs no AI key. Optional: a free `GEMINI_API_KEY` from Google AI Studio makes replies more conversational; it only sees the same facts.
+- **Ask the desk.** A chat assistant on every screen that explains what is going on, why a company was picked, who to contact, what is waiting for you and how to do anything. It reads the desk's own data, so English answers need no AI key. Optional: a free `GEMINI_API_KEY` from Google AI Studio makes replies more conversational; it only sees the same facts.
 - **Sarvam (optional).** With `SARVAM_API_KEY` set: ask the desk by voice or in Hindi and other Indian languages and hear the answer, read sponsor replies written in Indian scripts, and dictate meeting notes in any Indian language. Without the key nothing changes. Assistant facts, sponsor replies and dictated notes are sent to Sarvam to do this.
 - Theme: "Marigold" (indigo and festival gold) in light and dark, plus three more presets, built on the shadcn Base UI admin template (Next.js 16, Tailwind 4).
 
@@ -90,7 +102,7 @@ Node 22.5 or newer (`.nvmrc`). `npm run test:all` runs the ledger, email-engine 
 
 1. Import this repo in Vercel.
 2. Storage > Create Database > Neon (free). This adds `DATABASE_URL`.
-3. Environment variables: `APP_PASSWORD`, `CRUSTDATA_API_KEY`, `CRON_SECRET`, optional `TOKEN_KEY` and `SD_COUNTRY` (default `IND`), and for Gmail `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. No AI key.
+3. Environment variables: `APP_PASSWORD`, `CRUSTDATA_API_KEY`, `CRON_SECRET`, optional `SARVAM_API_KEY`, `TOKEN_KEY` and `SD_COUNTRY` (default `IND`), and for Gmail `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
 4. Redeploy. Sign in with your email and `APP_PASSWORD` (this creates the admin), add your team in Settings, then type the event in one line.
 
 ### Gmail (optional, otherwise draft mode)
@@ -104,6 +116,7 @@ The daily cycle runs on weekdays at 10:15 IST (Vercel cron) and from the "Run da
 
 ## Honest limits
 
+- Sponsor replies are translated only when written in an Indian script: Hindi typed in English letters stays untranslated. Dictation is live only, not an uploaded recording.
 - Contacts and signals are only as good as Crustdata's coverage; the app never invents an email, and unverified emails raise an exception for a person to check.
 - Templates are plain and consistent rather than creative. Every draft waits for a human, so edit freely before approving.
 - Prices are a rule of thumb. Check them against what peer events charge before you lock the floor.

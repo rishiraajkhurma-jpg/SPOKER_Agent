@@ -27,7 +27,7 @@ export const GET = wrap(async (req, user) => {
     settings: {
       approvers: people.filter((p) => !p.disabled && (p.role === "admin" || p.role === "approver")).map((p) => p.name).join(", "), postal: await getSetting("postal", ""),
       cap_new_per_day: await getSetting("cap_new_per_day", "30"), cap_total_per_day: await getSetting("cap_total_per_day", "60"), spacing_sec: await getSetting("spacing_sec", "60"),
-      gmail: await connectedEmail(), googleApp: hasGoogleApp(), crustdata: hasCrustdata(), source: dataSource(), engine: "Rules + Crustdata (no AI key)", permission: await getSetting("organiser_permission", ""),
+      gmail: await connectedEmail(), googleApp: hasGoogleApp(), crustdata: hasCrustdata(), source: dataSource(), engine: "Rules + Crustdata + Sarvam (optional)", permission: await getSetting("organiser_permission", ""),
     },
   };
 });

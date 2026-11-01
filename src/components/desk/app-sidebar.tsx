@@ -58,7 +58,7 @@ export function AppSidebar() {
           <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-gold font-heading text-lg font-extrabold text-gold-foreground shadow-md">S</div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="font-heading text-base font-bold leading-tight text-sidebar-accent-foreground">SponsorDesk</div>
-            <div className="text-[0.68rem] text-sidebar-foreground/70">Sponsorship agents · Crustdata</div>
+            <div className="text-[0.68rem] text-sidebar-foreground/70">Sponsorship agents · Crustdata · Sarvam</div>
           </div>
         </Link>
         {e && (
