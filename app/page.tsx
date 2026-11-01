@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 type Any = any;
 
@@ -501,7 +501,7 @@ function Room({ data, act, busy, approver, id, close, flash, load }: Any) {
                 {!sig.length && <span className="muted small">None yet.</span>}
                 <Sources list={c.sources} />
               </div>
-              {Object.values(c.role_map || {}).some(Boolean) && <div className="panel"><h2>Who moves the money</h2><dl className="kv" style={{ marginTop: 8 }}>{Object.entries(c.role_map).filter(([, v]) => v).map(([k, v]: Any) => <><dt key={k}>{k.replace("_", " ")}</dt><dd key={k + "v"}>{v}</dd></>)}</dl></div>}
+              {Object.values(c.role_map || {}).some(Boolean) && <div className="panel"><h2>Who moves the money</h2><dl className="kv" style={{ marginTop: 8 }}>{Object.entries(c.role_map).filter(([, v]) => v).map(([k, v]: Any) => <Fragment key={k}><dt>{k.replace("_", " ")}</dt><dd>{v}</dd></Fragment>)}</dl></div>}
             </div>
           )}
           {tab === "Decision makers" && <ContactTab contacts={contacts} act={act} busy={busy} co={c} />}
