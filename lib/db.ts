@@ -91,9 +91,26 @@ export function setDB(d: DB) {
   ready = null;
 }
 
+/** Local mode: SQLITE_PATH=./desk.db runs the app on one file, no database account needed (Node 22.5+). Not for Vercel. */
+async function makeSqlite(path: string): Promise<DB> {
+  const { DatabaseSync } = await import("node:sqlite" as any);
+  const sq = new DatabaseSync(path);
+  return {
+    q: async (text: string, params: any[] = []) => {
+      const t = text.replace(/\$(\d+)/g, "?$1");
+      const st = sq.prepare(t);
+      const ps = params.map((p) => (p === undefined ? null : typeof p === "boolean" ? Number(p) : p));
+      if (/^\s*(SELECT|WITH)/i.test(t) || /RETURNING/i.test(t)) return st.all(...ps) as Row[];
+      st.run(...ps);
+      return [];
+    },
+  };
+}
+
 async function makeNeon(): Promise<DB> {
+  if (process.env.SQLITE_PATH && !process.env.DATABASE_URL) return makeSqlite(process.env.SQLITE_PATH);
   const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set. In Vercel: Storage > Create Database > Neon, then redeploy.");
+  if (!url) throw new Error("DATABASE_URL is not set. In Vercel: Storage > Create Database > Neon, then redeploy. For a local run, set SQLITE_PATH=./desk.db instead.");
   const { neon } = await import("@neondatabase/serverless");
   const sql: any = neon(url);
   return { q: async (text: string, params: any[] = []) => (await sql.query(text, params)) as Row[] };

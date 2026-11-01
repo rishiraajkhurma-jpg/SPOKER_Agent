@@ -68,7 +68,7 @@ const TYPE_RULES: [EventType, RegExp][] = [
 ];
 export function eventType(text: string): EventType {
   for (const [t, rx] of TYPE_RULES) if (rx.test(text)) return t;
-  return /college|university|institute|fest|campus|school/i.test(text) ? "college" : "conference";
+  return /college|university|institute|fest|campus|school|\b(iit|iim|nit|bits|iiit|iisc)\b/i.test(text) ? "college" : "conference";
 }
 const AUDIENCE: Record<EventType, { who: string; short: string; age: string }> = {
   entrepreneurship: { who: "college students, early-stage founders, investors and startup mentors", short: "students and early-stage founders", age: "18 to 30" },
@@ -91,13 +91,14 @@ const INKIND: Record<EventType, string> = {
   college: "food and beverage, prizes, printing, merchandise, travel",
 };
 const TYPE_PRICE: Record<EventType, number> = { entrepreneurship: 1.2, tech: 1.1, management: 1.1, conference: 1.4, cultural: 1.0, college: 0.9, community: 0.8, sports: 0.8 };
+function lev(a: string, b: string) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
 const BIG_INSTITUTE = /\b(iit|iim|iisc|bits|nit|iiit|isb|xlri|nlu|aiims|iiser|university of|national institute)\b/i;
-const CITIES = ["Mumbai", "Delhi", "New Delhi", "Bengaluru", "Bangalore", "Hyderabad", "Chennai", "Kolkata", "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Kanpur", "Chandigarh", "Indore", "Bhopal", "Nagpur", "Surat", "Kochi", "Coimbatore", "Guwahati", "Bhubaneswar", "Patna", "Noida", "Gurugram", "Gurgaon", "Goa", "Mysuru", "Vellore", "Manipal", "Roorkee", "Kharagpur", "Varanasi", "Dehradun", "Visakhapatnam", "Vijayawada", "Thiruvananthapuram", "Madurai", "Tiruchirappalli", "Trichy", "Ranchi", "Raipur", "Amritsar", "Ludhiana", "Jodhpur", "Udaipur", "Pilani", "Powai", "Singapore", "Dubai", "London"];
+const CITIES = ["Mumbai", "Bombay", "Delhi", "New Delhi", "Bengaluru", "Bangalore", "Hyderabad", "Chennai", "Kolkata", "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Kanpur", "Chandigarh", "Indore", "Bhopal", "Nagpur", "Surat", "Kochi", "Coimbatore", "Guwahati", "Bhubaneswar", "Patna", "Noida", "Gurugram", "Gurgaon", "Goa", "Mysuru", "Vellore", "Manipal", "Roorkee", "Kharagpur", "Varanasi", "Dehradun", "Visakhapatnam", "Vijayawada", "Thiruvananthapuram", "Madurai", "Tiruchirappalli", "Trichy", "Ranchi", "Raipur", "Amritsar", "Ludhiana", "Jodhpur", "Udaipur", "Pilani", "Powai", "Singapore", "Dubai", "London"];
 
 /** Pull numbers like "20,000+ footfall", "1.2 lakh visitors", "5k registrations". */
 function parseCounts(text: string): { n: number; what: string; raw: string }[] {
   const out: { n: number; what: string; raw: string }[] = [];
-  const rx = /(\d[\d,]*(?:\.\d+)?)\s*(k|lakh|lac|l|crore|million|mn)?\s*\+?\s*(footfall|attendees|participants|registrations|visitors|students|delegates|people|startups|teams|colleges|speakers|hackers)/gi;
+  const rx = /(\d[\d,]*(?:\.\d+)?)\s*(k|lakh|lac|l|crore|million|mn)?\s*\+?\s*(footfall|attendees|participants|registrations|visitors|students|delegates|people|startups|teams|colleges|speakers|hackers|sports|events|competitions|athletes|runners)\b/gi;
   for (const m of text.matchAll(rx)) {
     let n = parseFloat(m[1].replace(/,/g, ""));
     const u = (m[2] || "").toLowerCase();
@@ -134,46 +135,74 @@ export type BriefResult =
 export async function buildBrief(oneLine: string, sender: { name: string; title?: string; phone?: string; email?: string }, answers = ""): Promise<BriefResult> {
   const text = `${oneLine}\n${answers}`.trim();
   const parts = oneLine.split(/[,|;\n]/).map((s) => s.trim()).filter(Boolean);
-  const name = parts[0] || "";
+  // "Aavhan 2027 IIT Bombay" in one chunk: the event is before the year, the organiser after it.
+  const ORG = /institute|college|university|school|\b(iit|iim|nit|bits|iiit|iisc)\b|e-?cell|club|society|foundation|association|council|chapter|community|\bpvt\b|\bltd\b|\bllp\b|\binc\b/i;
+  const split0 = (parts[0] || "").match(/^(.*?\b20\d{2})\s+(.+)$/) || (parts[0] || "").match(/^(.*?)\s+((?:by\s+)?(?:IIT|IIM|NIT|BITS|IIIT|IISc)\b.*)$/i);
+  if (split0 && ORG.test(split0[2])) parts.splice(0, 1, split0[1].trim(), split0[2].trim());
+  let name = parts[0] || "";
   const years = text.match(/\b20\d{2}\b/g) || [];
   const MONTH = /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\b/i;
   const datePart = parts.slice(1).find((p) => MONTH.test(p) || /\b20\d{2}\b/.test(p) && !/goal|budget|₹|inr|lakh/i.test(p)) || "";
-  const orgPart = parts.slice(1).find((p) => /institute|college|university|school|iit|iim|nit|bits|iiit|e-?cell|club|society|foundation|association|council|chapter|community|org|pvt|ltd|llp|inc\b|team|by /i.test(p) && p !== datePart) || "";
-  const cityHit = CITIES.find((c) => new RegExp(`\\b${c}\\b`, "i").test(text)) || "";
+  const orgPart = parts.slice(1).find((p) => (ORG.test(p) || /^by /i.test(p)) && p !== datePart) || "";
+  const cityRaw = CITIES.find((c) => new RegExp(`\\b${c}\\b`, "i").test(text)) || "";
+  const cityHit = ({ Bombay: "Mumbai", Powai: "Mumbai", Bangalore: "Bengaluru", Gurgaon: "Gurugram", Trichy: "Tiruchirappalli" } as Record<string, string>)[cityRaw] || cityRaw;
   const goal = (() => { const g = text.match(/(goal|target|raise|budget)[^\n,;]*/i); return g ? parseInr(g[0])[0] || 0 : 0; })();
   const pin = text.match(/\b\d{6}\b/)?.[0] || "";
-  const addrLine = (answers.split(/\n/).find((l) => /\b\d{6}\b/.test(l)) || "").replace(/^(address|postal address)\s*:\s*/i, "").trim();
+  const addrLine = (() => { const l = answers.split(/\n/).find((x) => /\b\d{6}\b/.test(x)) || ""; const m = l.match(/(?:postal address|address)\s*:\s*(.+)$/i); return (m ? m[1] : l.split(/(?<=[.!?])\s+/).find((x) => /\b\d{6}\b/.test(x)) || l).trim().replace(/\.$/, ""); })();
   const urlIn = text.match(/https?:\/\/[^\s,]+/)?.[0] || "";
 
-  // One cheap web search (1 credit) for the event's own pages and published numbers.
+  // Typo-tolerant: "Avhaan" matches "Aavhan" (edit distance 2 for long words, 1 for short ones).
+  const near = (w: string, tok: string) => tok === w || (w.length >= 4 && Math.abs(tok.length - w.length) <= 2 && lev(w, tok) <= (w.length >= 6 ? 2 : 1));
+  // The organiser's answers fix the spelling before we search ("It is Aavhan").
+  for (const w of name.split(/\s+/)) {
+    const fix = answers.split(/[^A-Za-z0-9]+/).find((t) => t.length >= 4 && t.toLowerCase() !== w.toLowerCase() && near(w.toLowerCase(), t.toLowerCase()));
+    if (fix && /^[a-z]/i.test(w) && !/^20\d\d$/.test(w)) name = name.replace(w, fix);
+  }
+  const words = name.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !/^20\d\d$/.test(w));
+  const tokens = (h: CD.WebHit) => `${h.title} ${h.snippet} ${h.url}`.toLowerCase().split(/[^a-z0-9]+/);
+  const isRel = (h: CD.WebHit) => words.length > 0 && words.every((w) => tokens(h).some((t) => near(w, t)));
+  // Web check: event name + organiser (1 credit), and once more without the year if nothing relevant came back.
   const trace = new CD.Trace();
   let hits: CD.WebHit[] = [];
   if (CD.hasCrustdata() && name) {
-    try { hits = await CD.webSearch(`${oneLine.replace(/goal[^,]*/i, "")} ${answers.slice(0, 200)}`.trim().slice(0, 300), trace); } catch { hits = []; }
+    const org0 = orgPart || (parts.slice(1).find((p) => ORG.test(p)) || "");
+    const queries = [`${name} ${org0}`.trim(), `${name.replace(/\b20\d{2}\b/, "").trim()} ${org0}`.trim()];
+    for (const q of [...new Set(queries)]) {
+      try { hits = hits.concat(await CD.webSearch(q.slice(0, 300), trace)); } catch { /* keep what we have */ }
+      if (hits.some(isRel)) break;
+    }
   }
-  const words = name.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !/^20\d\d$/.test(w));
-  const relevant = hits.filter((h) => words.length && words.every((w) => (h.title + " " + h.snippet + " " + h.url).toLowerCase().includes(w))).slice(0, 8);
+  const relevant = hits.filter(isRel).filter((h, i, all) => all.findIndex((x) => x.url === h.url) === i).slice(0, 8);
+  // Use the spelling the event's own pages use.
+  for (const w of words) {
+    const seen: Record<string, number> = {};
+    for (const h of relevant) for (const t of new Set(`${h.title} ${h.snippet}`.split(/[^A-Za-z0-9]+/))) if (t.toLowerCase() !== w && near(w, t.toLowerCase())) seen[t] = (seen[t] || 0) + 1;
+    const best = Object.entries(seen).sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] >= 2) name = name.replace(new RegExp(`\\b${w}\\b`, "i"), best[0][0].toUpperCase() + best[0].slice(1));
+  }
   const corpus = [text, ...relevant.map((h) => `${h.title}. ${h.snippet}`)].join("\n");
 
-  if (!name || (!orgPart && !relevant.length && !answers.trim())) {
+  if (!name || (!relevant.length && !answers.trim() && !parseCounts(text).length)) {
     const checked = await verifySources(relevant, [...trace.urls], 6);
     return {
       status: "clarify", searches: trace.calls.length, sources: checked.filter((c) => c.verified),
       found: name ? (hits.length ? `Found ${hits.length} pages, but none clearly about "${name}".` : `Nothing on the web clearly describes "${name}" yet.`) : "The line did not include an event name.",
-      questions: ["Who organises it (institute, club, company or community)?", "When and where is it (dates and city)?", "Roughly how many people attend, and who are they? Add the postal address with PIN for the email footer."],
+      questions: [orgPart ? `What kind of event is it (sports, cultural, technical, entrepreneurship, conference), and is "${name}" spelled the way the event spells it?` : "Who organises it (institute, club, company or community)?", "When and where is it (dates and city)?", "Roughly how many people attend, and who are they? Add the postal address with PIN for the email footer."],
     };
   }
 
   const type = eventType(`${name} ${oneLine} ${answers} ${relevant.map((h) => h.title).join(" ")}`);
   const counts = parseCounts(corpus);
-  const reachC = counts.filter((c) => /footfall|attendee|visitor|people|participant|delegate|registration|student/.test(c.what)).sort((a, b) => b.n - a.n)[0];
-  const typedReach = parseCounts(text)[0];
+  const reachC = counts.filter((c) => /footfall|attendee|visitor|people|participant|delegate|registration|student|athlete|runner/.test(c.what)).sort((a, b) => b.n - a.n)[0];
+  const typedReach = parseCounts(text).filter((c) => /footfall|attendee|visitor|people|participant|delegate|registration|student|athlete|runner/.test(c.what))[0];
   const reach = (typedReach || reachC)?.n || 0;
   const big = BIG_INSTITUTE.test(corpus);
   const R = reach || (type === "conference" ? 800 : big ? 12000 : 3000);
   const instMult = big ? 1.0 : 0.65;
   // Pricing rule: about INR 40 per attendee for the title tier, scaled by event type and the organiser's pull.
-  const title = clamp(roundTo(R * 40 * TYPE_PRICE[type] * instMult, 50000), 150000, 7500000);
+  const reachTitle = clamp(roundTo(R * 40 * TYPE_PRICE[type] * instMult, 50000), 150000, 7500000);
+  // With a goal, size the ladder so a realistic mix (1 Title, 2 Platinum, 4 Gold, 6 Silver = 3.6 x Title) reaches it.
+  const title = goal ? clamp(roundTo(goal / 3.6, 50000), 100000, 20000000) : reachTitle;
   const tiers: Tier[] = [
     { name: "Title", price_inr: title, deliverables: `"<Sponsor> presents" naming, main stage branding, 2 sessions or activations, logo on all media, 8 social posts, booth, post-event report` },
     { name: "Platinum", price_inr: roundTo(title * 0.5, 10000), deliverables: "Stage branding, 1 session or workshop, booth, logo on media, 5 social posts, post-event report" },
@@ -182,22 +211,35 @@ export async function buildBrief(oneLine: string, sender: { name: string; title?
   ];
   const floor = roundTo(tiers[3].price_inr * 0.8, 5000);
 
-  const proof = relevant.flatMap((h) => parseCounts(`${h.title}. ${h.snippet}`).map((c) => ({ claim: c.raw, url: h.url }))).slice(0, 6);
+  const proof = relevant.flatMap((h) => {
+    const t = `${h.title}. ${h.snippet}`; const yr = t.match(/\b(20\d{2})\b/)?.[1];
+    const prize = t.match(/(?:cash )?prize(?: pool| money)?[^.]{0,40}?(?:inr|rs\.?|₹)\s*[\d.,]+\s*\+?\s*(?:lakh|lac|crore|k)?\+?/i)?.[0];
+    return [...parseCounts(t).map((c) => ({ claim: yr ? `${c.raw} (${yr})` : c.raw, url: h.url })), ...(prize ? [{ claim: `${prize.trim()}${yr ? ` (${yr})` : ""}`, url: h.url }] : [])];
+  }).slice(0, 6);
   const spons = (() => {
+    const found: string[] = [];
+    for (const h of relevant) {
+      const t = `${h.title}. ${h.snippet}`;
+      for (const m of t.matchAll(/(?:proud to have|welcome|welcoming|thank(?:s| you) to|presenting|announcing|introducing)\s+((?:[A-Z][\w&.'-]*\s?){1,4})\s+as\s+(?:the|our)\s+((?:[A-Z][a-z]+\s?){0,3}(?:Partner|Sponsor))/g)) found.push(`${m[1].trim()} (${m[2].trim()}${t.match(/\b(20\d{2})\b/) ? `, ${t.match(/\b(20\d{2})\b/)![1]}` : ""})`);
+      for (const m of t.matchAll(/(?:sponsored by|powered by|in association with|title sponsor|associate sponsor)\s*:?\s*((?:[A-Z][\w&.'-]*\s?){1,4})/g)) found.push(m[1].trim());
+    }
+    if (found.length) return [...new Set(found)].slice(0, 8).join("; ") + " (from the event's own posts in web results)";
     for (const h of relevant) {
       const m = `${h.title}. ${h.snippet}`.match(/(?:sponsors?|partners?|sponsored by|partnered with)(?: include| like| such as| were| are|:)?\s+((?:[A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*)?)(?:,\s*(?:and\s+)?[A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*)?){1,8})/);
       if (m) return `${m[1]} (${host(h.url)})`;
     }
     return "";
   })();
-  const site = urlIn || relevant.find((h) => /\.(ac\.in|edu|org|in)\b|\bfest|summit/i.test(host(h.url)) || words.some((w) => host(h.url).includes(w)))?.url || "";
+  const snipSite = relevant.map((h) => (`${h.title} ${h.snippet}`.match(/\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+\.(?:com|in|org|co\.in|ac\.in|net|io|fest|events?))\b/i) || [])[1]).find((d) => d && words.some((w) => near(w, d.split(".")[0].toLowerCase()) || d.toLowerCase().includes(w)));
+  const site = urlIn || (snipSite ? `https://www.${snipSite}` : "") || relevant.find((h) => /\.(ac\.in|edu|org|in)\b|\bfest|summit/i.test(host(h.url)) || words.some((w) => host(h.url).includes(w)))?.url || "";
   const checked = await verifySources([...relevant.map((h) => ({ url: h.url, title: h.title, supports: h.snippet.slice(0, 160) })), ...proof.map((p) => ({ url: p.url, title: p.claim }))], [...trace.urls], 12);
   const good = checked.filter((c) => c.verified);
   const ok = (u: string) => good.some((g) => g.url === u.replace(/\/$/, "") || g.url === u);
   const proofItems = proof.map((p) => ({ claim: p.claim, url: p.url, verified: ok(p.url) }));
   const A = AUDIENCE[type];
   const sizeText = reach ? `${reach.toLocaleString("en-IN")} ${typedReach ? "expected (organiser's figure)" : `(${reachC?.raw}, ${host(relevant.find((h) => (h.title + h.snippet).includes(reachC?.raw || "~"))?.url || "web")})`}` : "size not stated yet: add footfall in Edit details";
-  const organizer = orgPart.replace(/^by\s+/i, "") || (answers.match(/(?:organi[sz]ed by|organi[sz]er\s*:)\s*([^\n,.]+)/i)?.[1] || "").trim() || "The organising team";
+  const caseFrom = (x: string) => { if (!x) return x; const src = [answers, ...relevant.map((h) => h.title + " " + h.snippet)].join(" "); const m = src.match(new RegExp(x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")); return m && m[0] !== x && /[A-Z]/.test(m[0]) ? m[0] : x; };
+  const organizer = caseFrom(orgPart.replace(/^by\s+/i, "")) || (answers.match(/(?:organi[sz]ed by|organi[sz]er\s*:)\s*([^\n,.]+)/i)?.[1] || "").trim() || "The organising team";
   const city = cityHit || (answers.match(/(?:city|venue|location)\s*:\s*([^\n,]+)/i)?.[1] || "").trim();
 
   const e: EventProfile = {
@@ -205,8 +247,8 @@ export async function buildBrief(oneLine: string, sender: { name: string; title?
     website: site, one_line: `${name}${organizer ? ` by ${organizer}` : ""}${city ? `, ${city}` : ""}: an event for ${A.short}.`,
     audience: `${sentenceCase(A.who)}, ages ${A.age} (typical for this kind of event). Size: ${sizeText}.`,
     audience_short: `${reach ? reach.toLocaleString("en-IN") + " " : ""}${A.short}`,
-    past_sponsors: spons || `Searched ${relevant.length ? relevant.slice(0, 3).map((h) => host(h.url)).join(", ") : "the web"}; no published sponsor list found. Add past sponsors in Edit details.`,
-    proof: proofItems.filter((p) => p.verified).map((p) => `${p.claim} (${host(p.url)})`).join("; ") || (reach ? `Organiser's figure: ${reach.toLocaleString("en-IN")} attendees. Add a public link that shows it.` : "No published reach numbers found yet. Add last edition's numbers with a link."),
+    past_sponsors: spons || `Searched ${relevant.length ? [...new Set(relevant.map((h) => /google\.com\/goto/.test(h.url) ? "web results" : host(h.url)))].slice(0, 3).join(", ") : "the web"}; no published sponsor list found. Add past sponsors in Edit details.`,
+    proof: proofItems.filter((p) => p.verified).map((p) => `${p.claim} (${/google\.com\/goto/.test(p.url) ? "web result" : host(p.url)})`).join("; ") || (reach ? `Organiser's figure: ${reach.toLocaleString("en-IN")} attendees. Add a public link that shows it.` : "No published reach numbers found yet. Add last edition's numbers with a link."),
     proof_items: proofItems,
     tiers, floor_inr: floor, goal_inr: goal || tiers[0].price_inr + tiers[1].price_inr + 2 * tiers[2].price_inr + 3 * tiers[3].price_inr, floor_locked: false,
     inkind_needs: INKIND[type], models: MODELS.slice(0, 8), policies: "Never sell judging or awards; share attendee data only with opt-in.",
@@ -214,7 +256,9 @@ export async function buildBrief(oneLine: string, sender: { name: string; title?
     sender: { name: sender.name, title: sender.title || `Partnerships, ${name}`, org: organizer, phone: sender.phone || "", email: sender.email || "" },
     postal_address: addrLine || [organizer, city, pin].filter(Boolean).join(", "),
     event_type: type, reach: R,
-    pricing_basis: `Rule of thumb: about INR 40 per attendee for the title tier at ${R.toLocaleString("en-IN")} reach${reach ? "" : " (estimated)"}, adjusted for a ${type} event${big ? " at a well-known institute" : ""}. Lower tiers are 50%, 25% and 10% of title. Check against what peers charge before locking.`,
+    pricing_basis: (goal
+      ? `Sized to your goal of ${lakh(goal)}: 1 Title, 2 Platinum, 4 Gold and 6 Silver deals reach it. A reach-based estimate (about INR 40 per attendee at ${R.toLocaleString("en-IN")}${reach ? "" : ", estimated"}) would put Title near ${lakh(reachTitle)}${title > reachTitle * 1.5 ? ": the goal needs more sponsors than that mix or stronger reach proof" : ""}.`
+      : `Rule of thumb: about INR 40 per attendee for the title tier at ${R.toLocaleString("en-IN")} reach${reach ? "" : " (estimated)"}, adjusted for a ${type} event${big ? " at a well-known institute" : ""}.`) + " Lower tiers are 50%, 25% and 10% of Title. Check against what peer events charge before locking.",
   };
   return { status: "ok", profile: e, searches: trace.calls.length, verified: good.length };
 }
@@ -227,7 +271,7 @@ const ICLASS: [IClass, RegExp][] = [
   ["investor", /venture capital|private equity|angel invest|accelerator|incubator/i],
   ["fintech", /financial|fintech|bank|payment|insurance|investment|capital markets|wealth|credit|lending|trading|broker/i],
   ["software", /software|it services|computer|internet|technology, information|data|cloud|saas|artificial intelligence|cyber|developer/i],
-  ["consumer", /retail|consumer|food|beverage|apparel|fashion|personal care|cosmetic|beauty|restaurant|e-?commerce|quick commerce|grocery|fmcg|wellness|fitness|sporting goods|luxury|furniture/i],
+  ["consumer", /retail|consumer|food|beverage|dairy|snack|confection|bakery|mineral water|packaged water|restaurant|apparel|fashion|personal care|cosmetic|beauty|restaurant|e-?commerce|quick commerce|grocery|fmcg|wellness|fitness|sporting goods|luxury|furniture/i],
   ["media", /media|entertainment|gaming|games|music|broadcast|publishing|advertising|marketing services|film|streaming/i],
   ["mobility", /transport|travel|hospitality|hotel|automotive|mobility|airline|logistics/i],
   ["hardware", /telecom|electronics|semiconductor|hardware|appliances|computers and electronics/i],
@@ -235,7 +279,8 @@ const ICLASS: [IClass, RegExp][] = [
   ["industrial", /manufactur|construction|energy|oil|mining|chemical|steel|cement|engineering/i],
   ["services", /consult|staffing|recruit|accounting|legal|outsourc/i],
 ];
-const iclass = (industry: string, desc = "") => (ICLASS.find(([, rx]) => rx.test(industry)) || ICLASS.find(([, rx]) => rx.test(desc.slice(0, 400))) || ["other"])[0] as IClass;
+const UNSAFE_DESC = /\b(tobacco|pan masala|gutka|gutkha|cigarettes?|liquor|whisk(e)?y|beer|casino|betting|gambling)\b/i;
+const iclass = (industry: string, desc = "") => UNSAFE_DESC.test(desc.slice(0, 2000)) ? "unsafe" as IClass : (ICLASS.find(([, rx]) => rx.test(industry)) || ICLASS.find(([, rx]) => rx.test(desc.slice(0, 400))) || ["other"])[0] as IClass;
 // How well each kind of company fits each kind of audience (0..1).
 const FIT: Record<EventType, Partial<Record<IClass, number>>> = {
   entrepreneurship: { investor: 1, fintech: 0.9, software: 0.9, edtech: 0.7, consumer: 0.6, media: 0.5, services: 0.6, hardware: 0.5, mobility: 0.4, health: 0.4, industrial: 0.3 },
@@ -253,7 +298,7 @@ const DISCOVER_INDUSTRIES: Record<EventType, string[]> = {
   entrepreneurship: ["Venture Capital and Private Equity Principals", "Financial Services", "Software Development", "Technology, Information and Internet", "IT Services and IT Consulting", "E-Learning Providers"],
   tech: ["Software Development", "Technology, Information and Internet", "IT Services and IT Consulting", "Computer Hardware Manufacturing", "Semiconductor Manufacturing", "E-Learning Providers"],
   management: ["Financial Services", "Business Consulting and Services", "Banking", "Investment Management", "Retail", "Advertising Services"],
-  sports: ["Retail Apparel and Fashion", "Sporting Goods Manufacturing", "Food and Beverage Services", "Beverage Manufacturing", "Wellness and Fitness Services", "Entertainment Providers"],
+  sports: ["Retail Apparel and Fashion", "Sporting Goods Manufacturing", "Food and Beverage Services", "Food and Beverage Manufacturing", "Beverage Manufacturing", "Wellness and Fitness Services", "Entertainment Providers", "Online Audio and Video Media"],
   cultural: ["Retail Apparel and Fashion", "Food and Beverage Services", "Entertainment Providers", "Personal Care Product Manufacturing", "Online Audio and Video Media", "Retail"],
   conference: ["Software Development", "IT Services and IT Consulting", "Financial Services", "Business Consulting and Services", "Technology, Information and Internet"],
   community: ["Software Development", "Technology, Information and Internet", "IT Services and IT Consulting", "E-Learning Providers"],
@@ -273,8 +318,9 @@ function companySignals(c: any): Signal[] {
   const gr6 = Number(g(c, "headcount.growth_percent.6m", "headcount.growth_percent.six_months"));
   const gr12 = Number(g(c, "headcount.growth_percent.12m", "headcount.growth_percent.yoy"));
   const hc = Number(g(c, "headcount.total") || 0);
-  if (isFinite(gr6) && Math.abs(gr6) >= 3) s.push({ claim: `Headcount ${gr6 > 0 ? "+" : ""}${Math.round(gr6)}% in 6 months${hc ? ` (now ${hc.toLocaleString("en-IN")})` : ""}`, source: "crustdata", date: new Date().toISOString().slice(0, 10) });
-  else if (isFinite(gr12) && Math.abs(gr12) >= 5) s.push({ claim: `Headcount ${gr12 > 0 ? "+" : ""}${Math.round(gr12)}% in 12 months${hc ? ` (now ${hc.toLocaleString("en-IN")})` : ""}`, source: "crustdata", date: new Date().toISOString().slice(0, 10) });
+  const glitch = (x: number) => x > (hc >= 1000 ? 80 : 200); // jumps like +180% at a 5,000-person company are renames or merges, not hiring
+  if (isFinite(gr6) && !glitch(gr6) && Math.abs(gr6) >= 3) s.push({ claim: `Headcount ${gr6 > 0 ? "+" : ""}${Math.round(gr6)}% in 6 months${hc ? ` (now ${hc.toLocaleString("en-IN")})` : ""}`, source: "crustdata", date: new Date().toISOString().slice(0, 10) });
+  else if (isFinite(gr12) && !glitch(gr12) && Math.abs(gr12) >= 5) s.push({ claim: `Headcount ${gr12 > 0 ? "+" : ""}${Math.round(gr12)}% in 12 months${hc ? ` (now ${hc.toLocaleString("en-IN")})` : ""}`, source: "crustdata", date: new Date().toISOString().slice(0, 10) });
   const open = Number(g(c, "hiring.openings_count") || 0);
   if (open >= 5) s.push({ claim: `${open} open roles${g(c, "hiring.recent_titles_csv") ? `, e.g. ${String(g(c, "hiring.recent_titles_csv")).split(",").slice(0, 2).join(",").trim()}` : ""}`, source: "crustdata", date: new Date().toISOString().slice(0, 10) });
   for (const n of (Array.isArray(c.news) ? c.news : []).filter((n: any) => CAMPUS.test(n.title || "") && daysAgo(n.date) < 730).slice(0, 2)) s.push({ claim: `In the news: ${n.title}`, source: n.url, date: n.date });
@@ -285,6 +331,18 @@ const CAUTION = /suspend|violat|ordered to pay|consumer (commission|court|forum)
 const CAMPUS = /campus|college|fest\b|students?|universit|hackathon|youth|gen ?z|internship|iit|iim|summit|sponsor/i;
 const DISTRESS = /layoff|lays off|laid off|job cuts|insolven|bankrupt|shuts? down|shutting down|winding up|fraud|raid|probe|default(s|ed)? on|delist|crisis/i;
 
+/** Listings that are not sponsor companies: schemes, franchise offers, other events, careers pages, link-in-bio sites. */
+function junk(c: any) {
+  const name = String(g(c, "basic_info.name") || ""), desc = String(g(c, "basic_info.description") || "").slice(0, 1500);
+  const dom = cleanDomain(g(c, "basic_info.primary_domain") || ""), web = String(g(c, "basic_info.website") || "");
+  if (!dom || /linktr\.ee|wa\.me|whatsapp|bit\.ly|instagram\.com|facebook\.com|talent500|naukri|indeed|blogspot|wixsite|godaddysites/i.test(dom + " " + web)) return true;
+  if (/work from home|franchise|dealership|distributorship|earn (from|at) home|unlimited earning|mlm|network marketing|direct selling|sourcing agent|we are recruiting/i.test(name + " " + desc)) return true;
+  if (/\b(fest|festival|college|university|institute|school|society|club)\b/i.test(name)) return true;
+  const gr = Number(g(c, "headcount.growth_percent.6m") || 0), hc = Number(g(c, "headcount.total") || 0);
+  if (gr > 300 && hc < 1000) return true; // tiny company with a data jump
+  return false;
+}
+
 export async function discover(e: EventProfile, count: number, exclude: string[]) {
   const trace = new CD.Trace();
   const type = e.event_type || eventType(`${e.name} ${e.one_line} ${e.audience}`);
@@ -292,12 +350,15 @@ export async function discover(e: EventProfile, count: number, exclude: string[]
   const country = process.env.SD_COUNTRY || "IND";
   const base: CD.Filter[] = [
     { field: "locations.country", type: "=", value: country },
-    { field: "headcount.total", type: "=>", value: 50 },
-    { op: "or", conditions: [{ field: "funding.last_fundraise_date", type: "=>", value: since }, { field: "headcount.growth_percent.6m", type: "=>", value: 8 }] },
+    // Real sponsors: 200+ people (bigger for bigger goals) and a real website.
+    { field: "headcount.total", type: "=>", value: (e.goal_inr || 0) >= 3000000 ? 500 : 200 },
+    { field: "basic_info.primary_domain", type: "is_not_null", value: null },
+    { op: "or", conditions: [{ field: "funding.last_fundraise_date", type: "=>", value: since }, { field: "headcount.growth_percent.6m", type: "=>", value: 5 }] },
   ];
   if (exclude.length) base.push({ field: "basic_info.name", type: "not_in", value: exclude.slice(0, 500) });
   const want = Math.min(Math.max(count, 3), 25);
-  const sorts = [{ field: "headcount.growth_percent.6m", order: "desc" as const }];
+  // Sort by size, not growth %: growth sorting surfaces tiny companies with data glitches.
+  const sorts = [{ field: "headcount.total", order: "desc" as const }];
   let rows = (await CD.searchCompanies({ op: "and", conditions: [...base, { field: "taxonomy.professional_network_industry", type: "in", value: DISCOVER_INDUSTRIES[type] }] }, want * 2, trace, sorts)).companies;
   if (rows.length < want) rows = rows.concat((await CD.searchCompanies({ op: "and", conditions: base }, want * 2, trace, sorts)).companies);
   const seen = new Set(exclude.map((x) => x.toLowerCase()));
@@ -307,7 +368,7 @@ export async function discover(e: EventProfile, count: number, exclude: string[]
     if (!name || seen.has(name.toLowerCase())) continue;
     const ind = String(g(c, "taxonomy.professional_network_industry") || "");
     const cls = iclass(ind, String(g(c, "basic_info.description") || ""));
-    if (cls === "unsafe") continue;
+    if (cls === "unsafe" || junk(c)) continue;
     seen.add(name.toLowerCase());
     const signals = companySignals(c);
     companies.push({
@@ -350,16 +411,17 @@ const OFFERS: Record<string, Offer> = {
   services_credits: { model: "services_credits", activation: (co) => `${co} credits for every team`, metric: "activated accounts", tracking: "a promo code", benefit: "Every team gets credits to build with." },
   prize_pool: { model: "prize_pool", activation: (co) => `a ${co} prize track`, metric: "submissions that use your product", tracking: "the submission form", benefit: "Builders compete for a prize judged on real use of the product." },
   brand_integration: { model: "brand_integration", activation: (co, ev) => `${co} presents the ${ev} main stage`, metric: "reach and impressions on official posts", tracking: "post analytics shared weekly", benefit: "Attendees get a better show, with the sponsor visible all day." },
+  sampling: { model: "product_inkind", activation: (co) => `${co} sampling and refreshment zone`, metric: "samples handed out and QR-code scans", tracking: "a QR code only this event uses", benefit: "Attendees try the product for free, right when they need it." },
   product_inkind: { model: "product_inkind", activation: (co) => `${co} as official product partner`, metric: "samples handed out and code redemptions", tracking: "a unique code", benefit: "Attendees try the product for free." },
   csr: { model: "csr", activation: (co) => `a ${co} community impact track`, metric: "people reached by the programme", tracking: "a shared impact sheet", benefit: "Participants work on a social problem with real mentors." },
 };
-function pickOffer(cls: IClass, type: EventType, hc: number, hiringUp: boolean): Offer {
+function pickOffer(cls: IClass, type: EventType, hc: number, hiringUp: boolean, digital = true): Offer {
   if (cls === "investor") return type === "entrepreneurship" ? OFFERS.case_competition : OFFERS.workshop;
   if (cls === "software" || cls === "hardware") return type === "tech" || type === "community" ? (hc < 500 ? OFFERS.services_credits : OFFERS.prize_pool) : hiringUp && hc >= 500 ? OFFERS.hiring : OFFERS.workshop;
   if (cls === "services" || cls === "industrial") return OFFERS.hiring;
   if (cls === "fintech") return type === "management" || type === "entrepreneurship" ? OFFERS.case_competition : OFFERS.activation;
   if (cls === "health") return OFFERS.csr;
-  if (cls === "consumer") return hc >= 1000 ? OFFERS.activation : OFFERS.product_inkind;
+  if (cls === "consumer") return !digital ? OFFERS.sampling : hc >= 1000 ? OFFERS.activation : OFFERS.product_inkind;
   if (cls === "media") return OFFERS.brand_integration;
   if (cls === "edtech") return OFFERS.activation;
   return hiringUp && hc >= 500 ? OFFERS.hiring : OFFERS.activation;
@@ -371,6 +433,23 @@ const TITLE_WORDS: Record<string, string[]> = {
   csr: ["csr", "foundation", "sustainability", "social impact", "corporate communications", "community"],
 };
 
+function ownDomain(email: string, domains: string[]) {
+  const d = String(email || "").toLowerCase().split("@")[1] || "";
+  if (!d) return false;
+  // Brand label: "bisleri" in bisleri.co.in, "amul" in amul.coop, "zee" in in.zee.com.
+  const label = (h: string) => { const p = h.split("."); const sld = p.length >= 3 && /^(co|com|org|net|ac|gov|edu)$/.test(p[p.length - 2]); return p[p.length - (sld ? 3 : 2)] || ""; };
+  return domains.some((c) => c && (d === c || d.endsWith("." + c) || (label(d).length >= 4 && label(d) === label(c))));
+}
+
+/** "Bisleri" from "Bisleri International Pvt Ltd" + bisleri.com; "Tata Play" from tataplay.com; else drop legal suffixes. */
+function brandName(name: string, domain: string) {
+  const label = cleanDomain(domain).split(".")[0];
+  const words = name.replace(/\(.*?\)/g, " ").trim().split(/\s+/);
+  let acc = "";
+  for (let i = 0; i < words.length && label; i++) { acc += words[i].toLowerCase().replace(/[^a-z0-9]/g, ""); if (acc === label) return words.slice(0, i + 1).join(" "); if (!label.startsWith(acc)) break; }
+  return name.replace(/\(.*?\)/g, "").replace(/\b(pvt\.?|private|ltd\.?|limited|inc\.?|llp|corp(oration)?|co\.)(?=\s|$)/gi, "").replace(/\s+/g, " ").trim() || name;
+}
+
 export async function analyze(e: EventProfile, company: { name: string; domain?: string; why_now?: string; crustdata_company_id?: number }) {
   const trace = new CD.Trace();
   const type = e.event_type || eventType(`${e.name} ${e.one_line} ${e.audience}`);
@@ -381,6 +460,7 @@ export async function analyze(e: EventProfile, company: { name: string; domain?:
     return { data: { decision: "drop", drop_reason: "Crustdata has no record of this company; add it by hand with its domain", signals: [], our_pov: empty, their_pov: empty, model: "", tier: "", price_range: "", angle: "", audience_benefit: "", role_map: {}, email: null } as Analysis, raw: raw() };
   }
   const coName = String(g(c, "basic_info.name") || company.name);
+  const brand = brandName(coName, String(g(c, "basic_info.primary_domain") || company.domain || ""));
   const cid = Number(g(c, "crustdata_company_id", "basic_info.crustdata_company_id") || company.crustdata_company_id || 0) || null;
   const domain = cleanDomain(g(c, "basic_info.primary_domain") || company.domain || g(c, "basic_info.website") || "");
   const domains = [domain, ...((g(c, "basic_info.all_domains") || []) as string[]).map(cleanDomain)].filter(Boolean);
@@ -394,14 +474,32 @@ export async function analyze(e: EventProfile, company: { name: string; domain?:
   const fundAge = daysAgo(lastFund);
   const openings = Number(g(c, "hiring.openings_count") || 0);
   const openYoy = Number(g(c, "hiring.openings_growth_percent.yoy") || 0);
-  const news: { title: string; url: string; date: string }[] = Array.isArray(c.news) ? c.news : [];
+  // News matched by name can be about something else ("VLCC" is also a class of oil tanker). For short names,
+  // keep an article only if it shares a word with what the company actually does.
+  const STOP = /^(their|there|which|about|across|india|indian|company|companies|years|world|leading|brand|brands|backed|market|markets|record|report|price|prices|potential|group|global|business|services|through|offers|offering|first|largest|growth|solutions|products|quality|people|today|since|every|other|under|while|where|after|before|million|billion|crore|share|shares|deal|deals|stake|owner|value|level|highs?)$/;
+  const stem = (w: string) => w.slice(0, 6);
+  const descStems = new Set(`${desc} ${industry}`.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 5 && !STOP.test(w)).map(stem));
+  const VOCAB: Partial<Record<IClass, RegExp>> = {
+    consumer: /beauty|skin|hair|salon|cosmetic|wellness|fitness|slimming|weight loss|food|snack|dairy|milk|ice ?cream|mineral water|drink|beverage|juice|store|outlet|retail|fashion|apparel|flavou?r|consumer|fmcg|restaurant|menu/i,
+    media: /channel|show|series|film|movie|ott|stream|tv|broadcast|content|audience|viewers?|music|podcast|audio|episode|ad revenue|advertis/i,
+    software: /software|cloud|ai\b|app|platform|developer|saas|data|cyber|tech/i, fintech: /bank|loan|credit|payment|upi|card|insur|invest|wallet|fintech|lending/i,
+    edtech: /learn|student|course|exam|education|edtech|tutor|school|college/i, health: /health|hospital|pharma|medic|clinic|patient|drug/i,
+  };
+  const shortName = (String(g(c, "basic_info.name") || company.name).replace(/[^A-Za-z ]/g, " ").trim().split(/\s+/)[0] || "").length <= 5;
+  const clsEarly = iclass(`${industry} ${((g(c, "basic_info.industries") || []) as string[]).join(" ")}`, desc);
+  // Short names: industry vocabulary only (description words like "welcome" or "backed" caused false matches).
+  const NOISE = /\b(tanker|freight|vessel|shipping|crude|charter|dwt|stocks?|share price|shares (rise|fall|jump|slip)|investors?|52-week|nse|bse|sensex|nifty|trading window)\b/i;
+  const onTopic = (t: string) => !NOISE.test(t) && (!shortName || /sponsor|campus|college|fest\b|hackathon|students?|universit/i.test(t) || (VOCAB[clsEarly] ? VOCAB[clsEarly]!.test(t) : t.toLowerCase().split(/[^a-z]+/).some((w) => w.length >= 6 && !STOP.test(w) && descStems.has(stem(w)))));
+  const allNews: { title: string; url: string; date: string }[] = (Array.isArray(c.news) ? c.news : []).filter((n: any) => !NOISE.test(String(n.title || "")) || DISTRESS.test(String(n.title || "")));
+  const news = allNews.filter((n) => onTopic(String(n.title || "")));
   const recent = news.filter((n) => daysAgo(n.date) < 180);
-  const distress = recent.filter((n) => DISTRESS.test(n.title || ""));
+  const recentAll = allNews.filter((n) => daysAgo(n.date) < 180);
+  const distress = recentAll.filter((n) => DISTRESS.test(n.title || ""));
   const campusNews = news.filter((n) => CAMPUS.test(n.title || "") && daysAgo(n.date) < 730);
   const signals = companySignals(c);
   for (const n of distress.slice(0, 2)) signals.push({ claim: `Negative signal: ${n.title}`, source: n.url, date: n.date });
-  for (const n of recent.filter((n) => !DISTRESS.test(n.title) && CAUTION.test(n.title || "")).slice(0, 2)) signals.push({ claim: `Caution (check before pitching): ${n.title}`, source: n.url, date: n.date });
-  for (const n of recent.filter((n) => !DISTRESS.test(n.title) && !CAUTION.test(n.title || "") && !CAMPUS.test(n.title)).slice(0, 2)) signals.push({ claim: `Recent news: ${n.title}`, source: n.url, date: n.date });
+  for (const n of recentAll.filter((n) => !DISTRESS.test(n.title) && CAUTION.test(n.title || "")).slice(0, 2)) signals.push({ claim: `Caution (check before pitching): ${n.title}`, source: n.url, date: n.date });
+  for (const n of recent.filter((n) => !DISTRESS.test(n.title) && !CAUTION.test(n.title || "") && !CAMPUS.test(n.title) && !/shares|in focus|stock/i.test(n.title)).slice(0, 2)) signals.push({ claim: `Recent news: ${n.title}`, source: n.url, date: n.date });
   const sources: Source[] = news.slice(0, 6).map((n) => ({ url: n.url, title: n.title }));
   for (const s of sources) trace.urls.add(s.url);
 
@@ -413,38 +511,47 @@ export async function analyze(e: EventProfile, company: { name: string; domain?:
 
   // People: who owns this budget, from Crustdata's people dataset.
   const hiringUp = openYoy > 0 || openings >= 10;
-  const offer = pickOffer(cls, type, hc, hiringUp);
+  const digital = /\bapp\b|online|digital|platform|e-?commerce|delivery|subscription|ott|streaming|software|fintech|payments?|internet/i.test(`${industry} ${desc}`);
+  const offer = pickOffer(cls, type, hc, hiringUp, digital);
   const kind = sponsorKind(SEGMENT[cls], offer.model);
   const words = [...new Set([...TITLE_WORDS[kind], ...(offer.model === "hiring" ? ["talent acquisition", "campus", "university relations", "employer brand"] : [])])];
   let people: any[] = [];
   if (!dropReason) { try { people = await CD.searchPeople(cid, coName, words, 12, trace); } catch (err: any) { signals.push({ claim: `People search failed: ${String(err.message).slice(0, 120)}`, source: "crustdata" }); } }
   const orgWords = `${e.organizer} ${e.name}`.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3 && !/^(the|team|club|cell|fest|summit|society|college|event)$/.test(w));
+  const coWord = (coName.toLowerCase().match(/[a-z]{4,}/) || [""])[0].replace(/s$/, "");
   const cands = people.map((p) => {
     const cur = (g(p, "experience.employment_details.current") || []).find((x: any) => !cid || !x.crustdata_company_id || Number(x.crustdata_company_id) === cid || String(x.name || "").toLowerCase() === coName.toLowerCase()) || (g(p, "experience.employment_details.current") || [])[0] || {};
     const title = String(cur.title || g(p, "basic_profile.headline") || "");
     const schools: string[] = (g(p, "education.schools") || []).map((s: any) => String(s.school || ""));
     const alum = orgWords.length >= 1 && schools.some((s) => orgWords.filter((w) => s.toLowerCase().includes(w)).length >= Math.min(2, orgWords.length));
     const url = String(g(p, "social_handles.professional_network_identifier.profile_url") || "");
-    const prelim = scoreContact({ position: title, responsibility: "", emailStatus: "UNAVAILABLE", phoneStatus: "UNAVAILABLE", evidenceDate: cur.start_date, companySize: hc }, kind);
-    return { name: String(g(p, "basic_profile.name") || ""), title, start: String(cur.start_date || "").slice(0, 10), url, alum, schools, hasEmail: !!g(p, "contact.has_business_email"), prelim: prelim.score + (g(p, "contact.has_business_email") ? 6 : 0) };
-  }).filter((x) => x.name && x.title).sort((a, b) => b.prelim - a.prelim);
+    // Ranking: role fit and authority. The record is current as of today, so tenure is not staleness.
+    const prelim = scoreContact({ position: title, responsibility: "", emailStatus: "UNAVAILABLE", phoneStatus: "UNAVAILABLE", evidenceDate: new Date().toISOString().slice(0, 10), companySize: hc }, kind);
+    const channel = /trade marketing|performance marketing|subscriber|e-?commerce|\bseo\b|\bcrm\b|\b(regional|area|zonal|territory)\b|retention|acquisition marketing/i.test(title) && !/head|chief|vp|vice president|director/i.test(title) ? 12 : 0;
+    const junior = /\b(assistant|associate|executive|intern|trainee|coordinator|specialist|staff)\b/i.test(title) && !/(associate|assistant) (vice president|director|general manager)|\bhead\b/i.test(title) ? 8 : 0;
+    // A newer "current" job at another company usually means they moved on.
+    const moved = (g(p, "experience.employment_details.current") || []).find((x: any) => x !== cur && x.crustdata_company_id && cid && Number(x.crustdata_company_id) !== cid && String(x.start_date || "") > String(cur.start_date || "0"));
+    return { name: String(g(p, "basic_profile.name") || ""), title, start: String(cur.start_date || "").slice(0, 10), url, alum, schools, moved: moved ? `${moved.title} at ${moved.name} since ${String(moved.start_date || "").slice(0, 7)}` : "", hasEmail: !!g(p, "contact.has_business_email"), prelim: prelim.score + (g(p, "contact.has_business_email") ? 6 : 0) - (moved ? 60 : 0) - channel - junior };
+  }).filter((x) => x.name && x.title && !(coWord && x.name.toLowerCase().replace(/[^a-z]/g, "").includes(coWord))).sort((a, b) => b.prelim - a.prelim); // a page named after the company is not a person
   const top = cands.slice(0, 2);
   // Business emails only for the two best people (2 credits each). Keep an address only if it belongs to THIS company.
   let mails: Record<string, { email: string; status: string; company_id?: number }[]> = {};
   if (top.some((t) => t.url)) { try { mails = await CD.businessEmails(top.map((t) => t.url), trace); } catch { mails = {}; } }
   const contacts: FoundContact[] = top.map((t, i) => {
     const list = mails[CD.normUrl(t.url)] || [];
-    const mine = list.find((m) => (cid && Number(m.company_id) === cid) || domains.some((d) => d && m.email.toLowerCase().endsWith("@" + d) || d && m.email.toLowerCase().endsWith("." + d)));
+    // The address itself must be on the company's domain (or a same-brand variant like bisleri.co.in for bisleri.com).
+    // A matching company id alone is not enough: Crustdata can tag an old employer's address with the new company.
+    const mine = list.find((m) => ownDomain(m.email, domains));
     const verified = !!mine && /^(valid|verified|deliverable|ok)$/i.test(mine.status);
-    const owns = /sponsor|partnership|alliance|brand|campus|event|employer brand|university|csr|community|developer relations/i.test(t.title);
+    const owns = /sponsor|partnership|alliance|brand|campus|event|experiential|employer brand|university|csr|community|developer relations|chief marketing|\bcmo\b|head[\s,&-]*(of\s+)?marketing|marketing head/i.test(t.title);
     const since = monthYear(t.start);
     return {
       kind: i === 0 ? "primary" : "alternative", full_name: t.name, designation: t.title,
       email: mine?.email || "", email_source: mine ? `crustdata (${mine.status})` : "", email_verified_by_crustdata: verified,
       responsibility: owns ? `Current title "${t.title}" at ${coName}${since ? ` since ${since}` : ""} (Crustdata)` : "",
       evidence: [{ claim: `${t.title} at ${coName}${since ? ` since ${since}` : ""}`, url: t.url, date: t.start }],
-      evidence_date: t.start, left_company: false,
-      reason: owns ? "Title shows they own brand, partnership or campus budgets" : "Closest available role to sponsorship at this company",
+      evidence_date: new Date().toISOString().slice(0, 10), left_company: !!t.moved,
+      reason: t.moved ? `May have left: now also listed as ${t.moved}` : owns ? "Title shows they own brand, partnership or campus budgets" : "Closest available role to sponsorship at this company",
       one_liner: `${t.title} at ${coName}${since ? `, in the role since ${since}` : ""}.`,
       hook: t.alum ? `Studied at ${t.schools.find((s) => orgWords.some((w) => s.toLowerCase().includes(w)))}` : "",
       iitb_alum: t.alum ? "yes" : t.schools.length ? "no" : "unknown", warm_path: t.alum ? "Alumnus of the organising institute: ask the alumni cell for an introduction" : "",
@@ -487,29 +594,29 @@ export async function analyze(e: EventProfile, company: { name: string; domain?:
   const tier = tiers[tIdx];
   const lower = tiers[tIdx + 1];
   const price = tier ? (lower ? `${lakh(lower.price_inr).replace("INR ", "INR ")} to ${lakh(tier.price_inr).replace("INR ", "")}` : `${lakh(tier.price_inr)}`) : "in-kind";
-  const activation = offer.activation(coName, e.name);
+  const activation = offer.activation(brand, e.name);
   const best = contacts[0];
   const hookSignal = signals.find((s) => s.source === "crustdata" && /Raised/.test(s.claim) && daysAgo(s.date) < 180) || signals.find((s) => /Headcount \+/.test(s.claim)) || signals.find((s) => /open roles/.test(s.claim));
-  const opener = !hookSignal ? `${coName} came up while we looked for partners who fit our audience.`
+  const opener = !hookSignal ? `${brand} came up while we looked for partners who fit our audience.`
     : /Raised/.test(hookSignal.claim) ? `Congratulations on the ${hookSignal.claim.replace(/^Raised (a |an )?/, "").replace(/ of USD.*/, "")}${monthYear(hookSignal.date) ? ` in ${monthYear(hookSignal.date)}` : ""}.`
-    : /Headcount/.test(hookSignal.claim) ? `${coName} has grown its team by ${(hookSignal.claim.match(/\+(\d+)%/) || [])[1] || "a good margin"}% in six months.`.replace("margin%", "margin")
-    : `${coName} is hiring across ${hookSignal.claim.match(/^\d+/)?.[0]} roles right now.`;
+    : /Headcount/.test(hookSignal.claim) ? `${brand} has grown its team by ${(hookSignal.claim.match(/\+(\d+)%/) || [])[1] || "a good margin"}% in six months.`.replace("margin%", "margin")
+    : `${brand} is hiring across ${hookSignal.claim.match(/^\d+/)?.[0]} roles right now.`;
   const audienceLine = `${e.name}${e.dates && !/confirmed/.test(e.dates) ? ` (${e.dates}${e.city && !/confirmed/.test(e.city) ? `, ${e.city}` : ""})` : ""} brings together ${e.audience_short || AUDIENCE[type].short}.`;
   const proofItem = (e.proof_items || []).find((p) => p.verified);
   const body = [
     `Hi ${first(best?.full_name)},`,
-    `${opener} ${audienceLine}${proofItem ? ` Last edition: ${proofItem.claim}.` : ""}`,
-    `Proposal: ${activation} at ${e.name}, ${price}, measured on ${offer.metric} through ${offer.tracking}, so the result sits in your own numbers.`,
+    `${opener} ${audienceLine}${proofItem ? ` Track record: ${proofItem.claim}.` : ""}`,
+    `Proposal: ${activation}${activation.includes(e.name) ? "" : ` at ${e.name}`}, ${price}, measured on ${offer.metric} through ${offer.tracking}, so the result sits in your own numbers.`,
     `Reply 'send' for the one-page plan.`,
     `If this is not relevant, reply 'no' and I will not follow up.`,
   ].join("\n\n");
-  const subject = `${coName} at ${e.name}`.split(/\s+/).slice(0, 7).join(" ");
+  const subject = `${brand} at ${e.name}`.split(/\s+/).slice(0, 7).join(" ");
 
   const a: Analysis = {
     decision: dropReason ? "drop" : "keep", drop_reason: dropReason,
     signals, our_pov: { score: sum(our), factors: our }, their_pov: { score: sum(their), factors: their },
     model: offer.model, tier: tier?.name || "", price_range: price,
-    angle: `${hookSignal ? hookSignal.claim : industry || "Good audience fit"}; ${activation} puts ${coName} in front of ${AUDIENCE[type].short}.`,
+    angle: `${hookSignal ? hookSignal.claim : industry || "Good audience fit"}. Offer: ${activation}, in front of ${AUDIENCE[type].short}.`,
     audience_benefit: offer.benefit,
     role_map: { champion: best ? `${best.full_name}, ${best.designation}` : "", budget_owner: cands.find((x) => /chief|cmo|vp|vice president|head/i.test(x.title))?.title || "", agency: "", procurement: hc > 1000 ? "Likely: vendor onboarding needs PAN, GST and bank letter" : "" },
     contacts: dropReason ? [] : contacts, company_contact: companyContact, company_size: hc,

@@ -15,7 +15,7 @@ export function sponsorKind(segment = "", model = ""): SponsorKind {
 }
 
 const ROLE_WORDS: Record<SponsorKind, { exact: RegExp; near: RegExp }> = {
-  brand: { exact: /\b(chief marketing|cmo|head of (marketing|brand)|marketing director|director,? marketing|brand (manager|head|lead|director)|brand partnerships?)\b/i, near: /\b(marketing|brand|campus|youth|growth marketing|communications)\b/i },
+  brand: { exact: /\b(chief (marketing|brand)|cmo|head[\s,&-]*(of\s+)?(marketing|brand|brand marketing)|(marketing|brand) head|marketing director|director,? (marketing|brand)|brand (manager|head|lead|director|experiences?|solutions|works|partnerships?|integrations?)|experiential|sponsorships?)\b/i, near: /\b(marketing|brand|campus|youth|growth marketing|communications)\b/i },
   event: { exact: /\b(head of partnerships?|sponsorships?( manager| lead| head)?|(strategic|corporate|brand) partnerships?|experiential( marketing)?|events? (manager|head|lead))\b/i, near: /\b(partnerships?|alliances|ecosystem|community|events?|campus|developer relations|devrel|employer brand(ing)?|university relations)\b/i },
   csr: { exact: /\b(head of csr|csr (manager|head|lead)|corporate communications head|head of corporate communications|community investment|sustainability (head|lead))\b/i, near: /\b(csr|foundation|sustainability|social impact|corporate communications|community)\b/i },
 };
