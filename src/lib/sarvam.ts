@@ -54,8 +54,10 @@ export async function fromEnglish(text: string, lang: string) {
 
 /** Audio up to 30 seconds. `translate` returns English, `transcribe` keeps the spoken language. */
 export async function transcribe(file: File, mode: "transcribe" | "translate" = "transcribe") {
+  // Browsers label recordings "audio/webm;codecs=opus"; Sarvam rejects anything after the semicolon.
+  const type = (file.type || "audio/webm").split(";")[0].trim();
   const form = new FormData();
-  form.append("file", file, file.name || "audio.webm");
+  form.append("file", new File([file], `audio.${type.split("/")[1]}`, { type }));
   form.append("model", "saaras:v4");
   form.append("mode", mode);
   form.append("language_code", "unknown");
