@@ -5,13 +5,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { cn } from "cn";
-import { ArrowUp, Bot, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, Bot, Loader2, Mic, RotateCcw, Sparkles, Square, Volume2, X } from "lucide-react";
 
 import { RichText } from "./bits";
 import { useDesk } from "./desk-provider";
 import { type Any, AGENTS, api, OP_AGENT } from "./format";
+import { playText, useVoice } from "./use-voice";
 
-type Msg = { role: "user" | "assistant"; text: string; actions?: Any[]; suggestions?: string[]; engine?: string; t: number };
+type Msg = { role: "user" | "assistant"; text: string; actions?: Any[]; suggestions?: string[]; engine?: string; lang?: string; t: number };
 
 export function Assistant() {
   const { chatOpen, setChatOpen, pendingQuestion, clearPending, busy, progress, openCompany, data } = useDesk();
@@ -25,19 +26,25 @@ export function Assistant() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const wasWorking = useRef(false);
 
-  const send = useCallback(async (text: string) => {
+  const send = useCallback(async (text: string, lang = "", spoken = false) => {
     const q = text.trim();
     if (!q || thinking) return;
     setMsgs((m) => [...m, { role: "user", text: q, t: Date.now() }]);
     setInput("");
     setThinking(true);
     try {
-      const r = await api("/api/assist", { message: q, path });
-      setMsgs((m) => [...m, { role: "assistant", text: r.reply, actions: r.actions, suggestions: r.suggestions, engine: r.engine, t: Date.now() }]);
+      const r = await api("/api/assist", { message: q, path, lang });
+      setMsgs((m) => [...m, { role: "assistant", text: r.reply, actions: r.actions, suggestions: r.suggestions, engine: r.engine, lang: r.lang, t: Date.now() }]);
+      if (spoken) playText(r.reply, r.lang).catch(() => {}); // asked out loud, answered out loud
     } catch (e: Any) {
       setMsgs((m) => [...m, { role: "assistant", text: `I could not reach the desk: ${e.message}`, t: Date.now() }]);
     } finally { setThinking(false); }
   }, [path, thinking]);
+  const voice = useVoice({
+    mode: "transcribe",
+    onText: (text, lang) => send(text, lang, true),
+    onError: (message) => setMsgs((m) => [...m, { role: "assistant", text: `Voice did not work: ${message}`, t: Date.now() }]),
+  });
 
   // First open: brief the user automatically.
   useEffect(() => { if (chatOpen && !msgs.length && !pendingQuestion) send("What's going on?"); }, [chatOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -114,7 +121,12 @@ export function Assistant() {
                       ))}
                     </div>
                   )}
+                  {voice.enabled && (
+                    <button type="button" onClick={() => playText(m.text, m.lang).catch(() => {})} aria-label="Read this reply aloud" title="Read aloud"
+                      className="ml-1 inline-flex items-center gap-1 text-[0.65rem] text-muted-foreground hover:text-primary"><Volume2 className="size-3" />Listen</button>
+                  )}
                   {m.engine === "gemini" && <div className="pl-1 text-[0.65rem] text-muted-foreground">Phrased by Gemini (free tier) from the desk's facts</div>}
+                  {m.engine === "sarvam" && <div className="pl-1 text-[0.65rem] text-muted-foreground">Translated by Sarvam from the desk's facts</div>}
                 </div>
               </div>
             ))}
@@ -139,6 +151,12 @@ export function Assistant() {
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
                 placeholder="Ask anything: why is Bisleri a P1?" aria-label="Your question"
                 className="max-h-28 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground" />
+              {voice.enabled && (
+                <button type="button" disabled={thinking || voice.working} onClick={voice.toggle} aria-label={voice.recording ? "Stop and send" : "Ask by voice in any Indian language"} title={voice.recording ? "Stop and send" : "Ask by voice in any Indian language"}
+                  className={cn("grid size-8 shrink-0 place-items-center rounded-xl border transition disabled:opacity-40", voice.recording ? "animate-pulse border-rose-500 bg-rose-500 text-white" : "bg-background text-foreground/70 hover:text-primary")}>
+                  {voice.working ? <Loader2 className="size-4 animate-spin" /> : voice.recording ? <Square className="size-3.5" /> : <Mic className="size-4" />}
+                </button>
+              )}
               <button type="submit" disabled={!input.trim() || thinking} aria-label="Send"
                 className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition disabled:opacity-40">
                 <ArrowUp className="size-4" />

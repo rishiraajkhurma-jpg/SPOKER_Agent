@@ -3,10 +3,11 @@
 // it rephrases the same facts more conversationally, and never invents numbers: it only sees the facts below.
 import { db, json, getSetting } from "./db";
 import { hasCrustdata } from "./crustdata";
+import { fromEnglish, toEnglish } from "./sarvam";
 import { categoryById } from "./sponsor-categories";
 
 export type AssistAction = { label: string; href?: string; open?: string };
-export type AssistReply = { reply: string; actions: AssistAction[]; suggestions: string[]; engine: "rules" | "gemini" };
+export type AssistReply = { reply: string; actions: AssistAction[]; suggestions: string[]; engine: "rules" | "gemini" | "sarvam"; lang?: string };
 
 const STAGE: Record<string, string> = {
   PROSPECT: "found, not scored yet", QUALIFIED: "scored", CONTACT_READY: "contact found", CONTACTED: "offer sent", FOLLOWUP_1: "follow-up 1 sent", FOLLOWUP_2: "follow-up 2 sent",
@@ -202,24 +203,31 @@ function defaultSuggestions(s: S) {
   return out.slice(0, 4);
 }
 
-/** Optional: a free Gemini key makes replies more conversational. Facts stay the same; on any error the rule answer is used. */
-export async function assist(message: string, path = ""): Promise<AssistReply> {
-  const base = await answer(message, path);
+const PHRASE = "You are the SponsorDesk assistant for event sponsorship teams in India. Rewrite the FACTS as a friendly, short answer to the user's question. Use only the facts: never add numbers, names, companies or promises that are not in them. Keep **bold** markers and bullet lists. Under 140 words. No em dashes.";
+
+async function geminiPhrase(key: string, prompt: string) {
+  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(9000),
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: PHRASE }] },
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 400, temperature: 0.3 },
+    }),
+  });
+  if (!res.ok) return "";
+  const j: any = await res.json();
+  return (j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join("").trim() as string;
+}
+
+/** Optional: a free Gemini key phrases replies more conversationally; a SARVAM_API_KEY answers in the user's Indian language. Facts stay the same; on any error the rule answer is used. */
+export async function assist(message: string, path = "", lang = ""): Promise<AssistReply> {
+  const q = await toEnglish(message, lang);
+  const base = await answer(q.text, path);
   const key = process.env.GEMINI_API_KEY;
-  if (!key || message.length > 600) return base;
-  try {
-    const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(9000),
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: "You are the SponsorDesk assistant for event sponsorship teams in India. Rewrite the FACTS as a friendly, short answer to the user's question. Use only the facts: never add numbers, names, companies or promises that are not in them. Keep **bold** markers and bullet lists. Under 140 words. No em dashes." }] },
-        contents: [{ role: "user", parts: [{ text: `QUESTION: ${message}\n\nFACTS:\n${base.reply}` }] }],
-        generationConfig: { maxOutputTokens: 400, temperature: 0.3 },
-      }),
-    });
-    if (!res.ok) return base;
-    const j: any = await res.json();
-    const text = (j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join("").trim();
-    return text ? { ...base, reply: text, engine: "gemini" } : base;
-  } catch { return base; }
+  let phrased = "";
+  if (key && message.length <= 600) phrased = await geminiPhrase(key, `QUESTION: ${q.text}\n\nFACTS:\n${base.reply}`).catch(() => "");
+  const english = phrased || base.reply;
+  const reply = await fromEnglish(english, q.lang);
+  return { ...base, reply, engine: reply !== english ? "sarvam" : phrased ? "gemini" : "rules", lang: q.lang };
 }

@@ -6,6 +6,7 @@ import * as G from "./gmail";
 import { dataSource } from "./crustdata";
 import * as CD from "./crustdata";
 import * as C from "./contacts";
+import { toEnglish } from "./sarvam";
 
 export const FALLBACK_DECK = "/fallback/sponsorship-deck.pdf";
 export const FALLBACK_MOU = "/fallback/mou.pdf";
@@ -344,7 +345,7 @@ export async function sendDue(budgetMs = 200000) {
 
 async function handleInbound(co: any, ct: any, gmailId: string, text: string, origin = "") {
   const e = await needEvent();
-  const c = await A.classify(text);
+  const c = await A.classify((await toEnglish(text)).text); // Hindi or other Indian-language replies go through the same rules
   const res = await L.recordReply({ gmail_id: gmailId, contact_id: ct.id, company_id: co.id, classification: c.label as any, summary: c.summary, offer_inr: c.offer_inr, resume_after: c.return_date });
   if (res === "DUPLICATE") return null;
   await L.log("A2", co.id, "reply", `${c.label}: ${c.summary}`);

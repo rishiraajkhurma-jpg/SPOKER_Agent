@@ -17,7 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { CompanyAvatar, FitRing, PriorityBadge, ScoreBar, StageBadge, VerifyBadge } from "./bits";
 import { useDesk } from "./desk-provider";
-import { type Any, brandName, host, inr, lakh, localInput, MODEL_LABEL, nextSlots, STAGE_LABEL, when } from "./format";
+import { type Any, api, brandName, host, inr, lakh, localInput, MODEL_LABEL, nextSlots, STAGE_LABEL, when } from "./format";
+import { useVoice } from "./use-voice";
 
 export function CompanySheet() {
   const { data, companyId, closeCompany } = useDesk();
@@ -254,6 +255,13 @@ function NextSteps({ c, primary }: { c: Any; primary: Any }) {
   const [start, setStart] = useState(localInput(2, 11));
   const [mins, setMins] = useState(30);
   const [notes, setNotes] = useState("");
+  const [voiceNote, setVoiceNote] = useState("");
+  const [tidying, setTidying] = useState(false);
+  const dictate = useVoice({ mode: "translate", continuous: true, onText: (text) => { setVoiceNote(""); setNotes((n) => (n ? `${n} ${text}` : text)); }, onError: setVoiceNote });
+  const tidy = async () => {
+    setTidying(true); setVoiceNote("");
+    try { setNotes((await api("/api/voice", { tidy: notes })).text); } catch (e: Any) { setVoiceNote(e.message); } finally { setTidying(false); }
+  };
   const tiers = data.event?.tiers || [];
   const t0 = tiers.find((t: Any) => t.name === c.tier) || tiers[0] || {};
   const [ds, setDs] = useState({ tier: t0.name || "", cash_inr: t0.price_inr || 0, deliverables: t0.deliverables || "", in_kind: "", sponsor_entity: "", sponsor_signatory: "", payment_terms: "" });
@@ -309,8 +317,11 @@ function NextSteps({ c, primary }: { c: Any; primary: Any }) {
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Paste meeting notes here" aria-label="Meeting notes" />
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={!!busy || !data.settings.gmail} onClick={() => act("gemini_notes", { company_id: c.id }, "Looking for meeting notes in Gmail", false).then((r: Any) => r?.text && setNotes(r.text))}>Fetch notes from Gmail</Button>
+            {dictate.enabled && <Button size="sm" variant="outline" disabled={!!busy || dictate.working && !dictate.recording} onClick={dictate.toggle}>{dictate.recording ? "Stop dictating" : dictate.working ? "Writing it down" : "Dictate notes (any Indian language)"}</Button>}
+            {dictate.enabled && <Button size="sm" variant="outline" disabled={!!busy || !notes || tidying || dictate.recording} onClick={tidy}>{tidying ? "Tidying" : "Tidy with Sarvam"}</Button>}
             <Button size="sm" disabled={!!busy || !notes} onClick={() => act("notes", { company_id: c.id, notes }, "Reading the meeting").then(() => setNotes(""))}>Digest and draft recap</Button>
           </div>
+          {voiceNote && <p className="text-xs text-rose-600">{voiceNote}</p>}
           {lastDigest && <div className="rounded-xl bg-muted/60 p-3"><span className="font-semibold">Last meeting · {lastDigest.temperature}</span><p>{lastDigest.summary}</p></div>}
         </Step>
       )}
